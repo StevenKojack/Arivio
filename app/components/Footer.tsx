@@ -1,0 +1,25 @@
+export function Footer() {
+  return (
+    <footer className="border-t border-neutral-200 bg-neutral-950 px-6 py-10 text-white sm:px-8 lg:px-12">
+      <div className="mx-auto flex max-w-7xl flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-lg font-semibold tracking-tight">Arivio</p>
+          <p className="mt-2 text-sm text-neutral-400">
+            The modern marketplace for planning every event.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-x-6 gap-y-3 text-sm text-neutral-300">
+          <a className="transition hover:text-white" href="#categories">
+            Categories
+          </a>
+          <a className="transition hover:text-white" href="#">
+            Home
+          </a>
+          <a className="transition hover:text-white" href="#start">
+            Start Planning
+          </a>
+        </div>
+      </div>
+    </footer>
+  );
+}
