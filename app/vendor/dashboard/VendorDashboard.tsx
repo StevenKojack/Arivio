@@ -11,11 +11,16 @@ import { getQuoteRequestsForVendors } from "@/lib/repositories/quotesRepository"
 import {
   createAvailabilityWindow,
   createVendorService,
+  deleteAvailabilityWindow,
+  deleteVendorPhoto,
+  deleteVendorService,
   getVendorAvailabilityByVendorIds,
   getVendorBusinessesByOwner,
   getVendorPhotosByVendorIds,
   getVendorServicesByVendorIds,
+  uploadVendorPhoto,
   updateVendorBusiness,
+  updateVendorVacationMode,
   updateVendorService,
   type VendorAvailabilityRow,
   type VendorBusinessRow,
@@ -126,13 +131,19 @@ export function VendorDashboard() {
       requireString(draft.serviceName, "Service name");
       const supabase = createBrowserSupabaseClient();
       const service = await createVendorService(supabase, {
+        active: draft.active,
         basePrice: draft.pricingType === "hourly" ? null : draft.basePrice,
         category: draft.category,
-        eventTypesSupported: eventTypes,
+        description: draft.description || null,
+        eventTypesSupported: draft.eventTypesSupported.length
+          ? draft.eventTypesSupported
+          : eventTypes,
         hourlyRate: draft.pricingType === "hourly" ? draft.hourlyRate : null,
         minimumHours: draft.pricingType === "hourly" ? draft.minimumHours : null,
         pricingType: draft.pricingType,
         serviceName: draft.serviceName,
+        setupFee: draft.setupFee,
+        travelFee: draft.travelFee,
         vendorId: vendor.id,
       });
 
@@ -140,6 +151,49 @@ export function VendorDashboard() {
       setMessage("Service created.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to create service.");
+    }
+  }
+
+  async function handleUpdateService(serviceId: string, draft: ServiceDraft) {
+    try {
+      requireString(draft.serviceName, "Service name");
+      const supabase = createBrowserSupabaseClient();
+      const updatedService = await updateVendorService(supabase, {
+        active: draft.active,
+        basePrice: draft.pricingType === "hourly" ? null : draft.basePrice,
+        category: draft.category,
+        description: draft.description || null,
+        eventTypesSupported: draft.eventTypesSupported.length
+          ? draft.eventTypesSupported
+          : eventTypes,
+        hourlyRate: draft.pricingType === "hourly" ? draft.hourlyRate : null,
+        id: serviceId,
+        minimumHours: draft.pricingType === "hourly" ? draft.minimumHours : null,
+        pricingType: draft.pricingType,
+        serviceName: draft.serviceName,
+        setupFee: draft.setupFee,
+        travelFee: draft.travelFee,
+      });
+
+      setServices((current) =>
+        current.map((service) =>
+          service.id === serviceId ? updatedService : service,
+        ),
+      );
+      setMessage("Service updated.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to update service.");
+    }
+  }
+
+  async function handleDeleteService(service: VendorServiceRow) {
+    try {
+      const supabase = createBrowserSupabaseClient();
+      await deleteVendorService(supabase, service.id);
+      setServices((current) => current.filter((item) => item.id !== service.id));
+      setMessage("Service deleted.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to delete service.");
     }
   }
 
@@ -170,6 +224,62 @@ export function VendorDashboard() {
       setMessage("Availability saved.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to save availability.");
+    }
+  }
+
+  async function handleDeleteAvailability(availabilityId: string) {
+    try {
+      const supabase = createBrowserSupabaseClient();
+      await deleteAvailabilityWindow(supabase, availabilityId);
+      setAvailability((current) =>
+        current.filter((window) => window.id !== availabilityId),
+      );
+      setMessage("Availability removed.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to delete availability.");
+    }
+  }
+
+  async function handleToggleVacationMode(vendor: VendorBusinessRow) {
+    try {
+      const supabase = createBrowserSupabaseClient();
+      const updatedVendor = await updateVendorVacationMode(supabase, {
+        id: vendor.id,
+        vacationMode: !vendor.vacation_mode,
+      });
+      setVendors((current) =>
+        current.map((item) => (item.id === vendor.id ? updatedVendor : item)),
+      );
+      setMessage(updatedVendor.vacation_mode ? "Vacation mode enabled." : "Vacation mode disabled.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to update vacation mode.");
+    }
+  }
+
+  async function handleUploadPhoto(vendorId: string, file: File) {
+    try {
+      const supabase = createBrowserSupabaseClient();
+      const result = await uploadVendorPhoto(supabase, {
+        file,
+        sortOrder: photos.filter((photo) => photo.vendor_id === vendorId).length,
+        vendorId,
+      });
+
+      setPhotos((current) => [result.photo, ...current]);
+      setMessage("Photo uploaded.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to upload photo.");
+    }
+  }
+
+  async function handleDeletePhoto(photo: VendorPhotoRow) {
+    try {
+      const supabase = createBrowserSupabaseClient();
+      await deleteVendorPhoto(supabase, photo);
+      setPhotos((current) => current.filter((item) => item.id !== photo.id));
+      setMessage("Photo deleted.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to delete photo.");
     }
   }
 
@@ -307,7 +417,9 @@ export function VendorDashboard() {
         {activeTab === "Services" ? (
           <ServicesTab
             onCreateService={handleCreateService}
+            onDeleteService={handleDeleteService}
             onToggleService={handleToggleService}
+            onUpdateService={handleUpdateService}
             services={services}
             vendors={vendors}
           />
@@ -316,10 +428,19 @@ export function VendorDashboard() {
           <AvailabilityTab
             availability={availability}
             onCreateAvailability={handleCreateAvailability}
+            onDeleteAvailability={handleDeleteAvailability}
+            onToggleVacationMode={handleToggleVacationMode}
             vendors={vendors}
           />
         ) : null}
-        {activeTab === "Photos" ? <PhotosTab photos={photos} /> : null}
+        {activeTab === "Photos" ? (
+          <PhotosTab
+            onDeletePhoto={handleDeletePhoto}
+            onUploadPhoto={handleUploadPhoto}
+            photos={photos}
+            vendors={vendors}
+          />
+        ) : null}
         {activeTab === "Quotes" ? (
           <QuotesTab onRespondQuote={handleRespondQuote} quotes={quotes} />
         ) : null}

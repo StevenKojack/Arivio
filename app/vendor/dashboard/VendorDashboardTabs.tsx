@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
-import { allServices } from "@/app/data/marketplace";
+import { allServices, eventTypes } from "@/app/data/marketplace";
 import type { BookingRow } from "@/lib/repositories/bookingsRepository";
 import type { QuoteRequestRow } from "@/lib/repositories/quotesRepository";
 import type {
@@ -42,12 +43,17 @@ export const vendorDashboardTabs: VendorDashboardTab[] = [
 ];
 
 export type ServiceDraft = {
+  active: boolean;
   basePrice: number;
   category: string;
+  description: string;
+  eventTypesSupported: string[];
   hourlyRate: number;
   minimumHours: number;
   pricingType: PricingType;
   serviceName: string;
+  setupFee: number;
+  travelFee: number;
 };
 
 export type AvailabilityDraft = {
@@ -74,13 +80,19 @@ type VendorTabProps = {
   message?: string;
   onCreateAvailability: (draft: AvailabilityDraft) => Promise<void>;
   onCreateService: (draft: ServiceDraft) => Promise<void>;
+  onDeleteAvailability: (availabilityId: string) => Promise<void>;
+  onDeletePhoto: (photo: VendorPhotoRow) => Promise<void>;
+  onDeleteService: (service: VendorServiceRow) => Promise<void>;
   onRespondQuote: (
     quoteId: string,
     status: Extract<QuoteStatus, "accepted" | "declined" | "countered">,
     vendorFinalPrice?: number | null,
   ) => Promise<void>;
   onToggleService: (service: VendorServiceRow) => Promise<void>;
+  onToggleVacationMode: (vendor: VendorBusinessRow) => Promise<void>;
   onUpdateBusiness: (vendorId: string, draft: BusinessDraft) => Promise<void>;
+  onUpdateService: (serviceId: string, draft: ServiceDraft) => Promise<void>;
+  onUploadPhoto: (vendorId: string, file: File) => Promise<void>;
   photos: VendorPhotoRow[];
   quotes: QuoteWithEvent[];
   services: VendorServiceRow[];
@@ -143,22 +155,74 @@ export function DashboardTab({
 
 export function ServicesTab({
   onCreateService,
+  onDeleteService,
   onToggleService,
+  onUpdateService,
   services,
   vendors,
-}: Pick<VendorTabProps, "onCreateService" | "onToggleService" | "services" | "vendors">) {
+}: Pick<
+  VendorTabProps,
+  | "onCreateService"
+  | "onDeleteService"
+  | "onToggleService"
+  | "onUpdateService"
+  | "services"
+  | "vendors"
+>) {
   const [draft, setDraft] = useState<ServiceDraft>({
+    active: true,
     basePrice: 300,
     category: "DJ",
+    description: "",
+    eventTypesSupported: ["Birthday", "Wedding", "Private Party"],
     hourlyRate: 100,
     minimumHours: 3,
     pricingType: "hourly",
     serviceName: "DJ package",
+    setupFee: 0,
+    travelFee: 0,
   });
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  function loadService(service: VendorServiceRow) {
+    setEditingId(service.id);
+    setDraft({
+      active: service.active,
+      basePrice: Number(service.base_price ?? 0),
+      category: service.category,
+      description: service.description ?? "",
+      eventTypesSupported: service.event_types_supported,
+      hourlyRate: Number(service.hourly_rate ?? 0),
+      minimumHours: Number(service.minimum_hours ?? 1),
+      pricingType: service.pricing_type,
+      serviceName: service.service_name,
+      setupFee: Number(service.setup_fee ?? 0),
+      travelFee: Number(service.travel_fee ?? 0),
+    });
+  }
+
+  function toggleEventType(eventType: string) {
+    setDraft((current) => ({
+      ...current,
+      eventTypesSupported: current.eventTypesSupported.includes(eventType)
+        ? current.eventTypesSupported.filter((item) => item !== eventType)
+        : [...current.eventTypesSupported, eventType],
+    }));
+  }
+
+  async function saveService() {
+    if (editingId) {
+      await onUpdateService(editingId, draft);
+      setEditingId(null);
+      return;
+    }
+
+    await onCreateService(draft);
+  }
 
   return (
     <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
-      <Panel title="Create service">
+      <Panel title={editingId ? "Edit service" : "Create service"}>
         <div className="grid gap-3">
           <Input label="Service name" value={draft.serviceName} onChange={(value) => setDraft({ ...draft, serviceName: value })} />
           <label className="grid gap-2 text-sm font-semibold text-neutral-800">
@@ -172,6 +236,14 @@ export function ServicesTab({
                 <option key={service}>{service}</option>
               ))}
             </select>
+          </label>
+          <label className="grid gap-2 text-sm font-semibold text-neutral-800">
+            Description
+            <textarea
+              value={draft.description}
+              onChange={(event) => setDraft({ ...draft, description: event.target.value })}
+              className="min-h-24 rounded-lg border border-neutral-300 px-3 py-2"
+            />
           </label>
           <label className="grid gap-2 text-sm font-semibold text-neutral-800">
             Pricing
@@ -208,14 +280,67 @@ export function ServicesTab({
               onChange={(value) => setDraft({ ...draft, minimumHours: Number(value) })}
             />
           ) : null}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Input
+              label="Setup fee"
+              type="number"
+              value={String(draft.setupFee)}
+              onChange={(value) => setDraft({ ...draft, setupFee: Number(value) })}
+            />
+            <Input
+              label="Travel fee"
+              type="number"
+              value={String(draft.travelFee)}
+              onChange={(value) => setDraft({ ...draft, travelFee: Number(value) })}
+            />
+          </div>
+          <label className="flex items-center gap-3 rounded-lg border border-neutral-200 p-3 text-sm font-semibold text-neutral-800">
+            <input
+              type="checkbox"
+              checked={draft.active}
+              onChange={(event) => setDraft({ ...draft, active: event.target.checked })}
+              className="h-4 w-4 accent-[#ff5a5f]"
+            />
+            Active in marketplace
+          </label>
+          <fieldset className="rounded-lg border border-neutral-200 p-3">
+            <legend className="px-1 text-sm font-semibold text-neutral-800">
+              Event types supported
+            </legend>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {eventTypes.map((eventType) => (
+                <button
+                  key={eventType}
+                  type="button"
+                  onClick={() => toggleEventType(eventType)}
+                  className={`rounded-full px-3 py-2 text-xs font-semibold ${
+                    draft.eventTypesSupported.includes(eventType)
+                      ? "bg-neutral-950 text-white"
+                      : "border border-neutral-300 text-neutral-700"
+                  }`}
+                >
+                  {eventType}
+                </button>
+              ))}
+            </div>
+          </fieldset>
           <button
             type="button"
-            onClick={() => onCreateService(draft)}
+            onClick={saveService}
             disabled={!vendors.length}
             className="h-11 rounded-full bg-neutral-950 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Create service
+            {editingId ? "Save service" : "Create service"}
           </button>
+          {editingId ? (
+            <button
+              type="button"
+              onClick={() => setEditingId(null)}
+              className="h-11 rounded-full border border-neutral-300 px-4 text-sm font-semibold text-neutral-950"
+            >
+              Cancel edit
+            </button>
+          ) : null}
         </div>
       </Panel>
       <Panel title="Services">
@@ -237,6 +362,25 @@ export function ServicesTab({
                   {service.active ? "Disable" : "Enable"}
                 </button>
               </div>
+              <p className="mt-3 text-sm text-neutral-600">
+                {service.description || "No description added."}
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => loadService(service)}
+                  className="rounded-full bg-neutral-950 px-3 py-1 text-xs font-semibold text-white"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDeleteService(service)}
+                  className="rounded-full border border-red-200 px-3 py-1 text-xs font-semibold text-red-700"
+                >
+                  Delete
+                </button>
+              </div>
             </div>
           ))
         ) : (
@@ -249,9 +393,18 @@ export function ServicesTab({
 
 export function AvailabilityTab({
   availability,
+  onDeleteAvailability,
   onCreateAvailability,
+  onToggleVacationMode,
   vendors,
-}: Pick<VendorTabProps, "availability" | "onCreateAvailability" | "vendors">) {
+}: Pick<
+  VendorTabProps,
+  | "availability"
+  | "onCreateAvailability"
+  | "onDeleteAvailability"
+  | "onToggleVacationMode"
+  | "vendors"
+>) {
   const [draft, setDraft] = useState<AvailabilityDraft>({
     date: "",
     endTime: "17:00",
@@ -265,6 +418,36 @@ export function AvailabilityTab({
     <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
       <Panel title="Business hours">
         <div className="grid gap-3">
+          <div className="grid gap-2">
+            {vendors.map((vendor) => (
+              <div
+                key={vendor.id}
+                className="flex items-center justify-between rounded-lg border border-neutral-200 p-3"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-neutral-950">
+                    {vendor.business_name}
+                  </p>
+                  <p className="mt-1 text-xs text-neutral-500">
+                    {vendor.vacation_mode
+                      ? "Vacation mode hides this business from marketplace"
+                      : "Accepting marketplace inquiries"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onToggleVacationMode(vendor)}
+                  className={`rounded-full px-3 py-2 text-xs font-semibold ${
+                    vendor.vacation_mode
+                      ? "bg-[#ff5a5f] text-white"
+                      : "border border-neutral-300 text-neutral-950"
+                  }`}
+                >
+                  {vendor.vacation_mode ? "Vacation on" : "Vacation off"}
+                </button>
+              </div>
+            ))}
+          </div>
           <div className="grid grid-cols-7 gap-2">
             {weeklyDays.map((day) => (
               <span
@@ -278,7 +461,7 @@ export function AvailabilityTab({
           <Input label="Default start" type="time" value={draft.startTime} onChange={(value) => setDraft({ ...draft, startTime: value })} />
           <Input label="Default end" type="time" value={draft.endTime} onChange={(value) => setDraft({ ...draft, endTime: value })} />
           <div className="rounded-lg border border-dashed border-neutral-300 p-4 text-sm text-neutral-600">
-            Weekly schedule and vacation mode are represented in the dashboard UI. Persisted availability currently uses dated availability rows.
+            Use available windows for specific bookable dates and blackout dates for unavailable dates. Vacation mode hides the entire business from the marketplace.
           </div>
         </div>
       </Panel>
@@ -328,11 +511,21 @@ export function AvailabilityTab({
         <div className="mt-5 space-y-2">
           {availability.length ? (
             availability.map((window) => (
-              <Row
-                key={window.id}
-                title={`${formatDate(window.date)} - ${window.status}`}
-                detail={`${formatTime(window.start_time)} to ${formatTime(window.end_time)}`}
-              />
+              <div key={window.id} className="rounded-lg border border-neutral-200 p-4">
+                <p className="font-semibold text-neutral-950">
+                  {formatDate(window.date)} - {window.status}
+                </p>
+                <p className="mt-1 text-sm text-neutral-500">
+                  {formatTime(window.start_time)} to {formatTime(window.end_time)}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => onDeleteAvailability(window.id)}
+                  className="mt-3 rounded-full border border-red-200 px-3 py-1 text-xs font-semibold text-red-700"
+                >
+                  Delete
+                </button>
+              </div>
             ))
           ) : (
             <EmptyLine text="No availability rows saved yet." />
@@ -343,24 +536,98 @@ export function AvailabilityTab({
   );
 }
 
-export function PhotosTab({ photos }: Pick<VendorTabProps, "photos">) {
+export function PhotosTab({
+  onDeletePhoto,
+  onUploadPhoto,
+  photos,
+  vendors,
+}: Pick<
+  VendorTabProps,
+  "onDeletePhoto" | "onUploadPhoto" | "photos" | "vendors"
+>) {
+  const [vendorId, setVendorId] = useState(vendors[0]?.id ?? "");
+  const [fileName, setFileName] = useState("");
+  const selectedVendor = vendors.find((vendor) => vendor.id === vendorId);
+
+  async function uploadFile(file: File | undefined) {
+    if (!file || !vendorId) {
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setFileName("Photo uploads must be 5MB or smaller.");
+      return;
+    }
+
+    setFileName(file.name);
+    await onUploadPhoto(vendorId, file);
+  }
+
   return (
     <Panel title="Photos">
-      <div className="rounded-lg border border-dashed border-neutral-300 p-5 text-sm text-neutral-600">
-        Upload UI is prepared for the future file-upload milestone. For now, photos read from vendor_photos and render in marketplace cards.
+      <div className="grid gap-3 rounded-lg border border-dashed border-neutral-300 p-5 text-sm text-neutral-600">
+        <p>
+          Upload JPEG, PNG, or WebP images up to 5MB. Photos are saved in
+          Supabase Storage and written to vendor_photos.
+        </p>
+        <label className="grid gap-2 text-sm font-semibold text-neutral-800">
+          Vendor
+          <select
+            value={vendorId}
+            onChange={(event) => setVendorId(event.target.value)}
+            className="h-11 rounded-lg border border-neutral-300 bg-white px-3"
+          >
+            {vendors.map((vendor) => (
+              <option key={vendor.id} value={vendor.id}>
+                {vendor.business_name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex h-12 cursor-pointer items-center justify-center rounded-full bg-neutral-950 px-4 text-sm font-semibold text-white">
+          Upload photo
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="sr-only"
+            onChange={(event) => {
+              void uploadFile(event.target.files?.[0]);
+              event.target.value = "";
+            }}
+          />
+        </label>
+        {fileName ? (
+          <p className="text-xs font-semibold text-neutral-500">
+            Last selected: {fileName}
+          </p>
+        ) : null}
       </div>
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
-        {photos.length ? (
-          photos.map((photo) => (
-            <div
-              key={photo.id}
-              className="h-40 rounded-lg bg-cover bg-center"
-              style={{ backgroundImage: `url(${photo.image_url})` }}
-            />
-          ))
+        {selectedVendor ? (
+          photos
+            .filter((photo) => photo.vendor_id === selectedVendor.id)
+            .map((photo) => (
+              <div key={photo.id} className="overflow-hidden rounded-lg border border-neutral-200">
+                <div
+                  className="h-40 bg-cover bg-center"
+                  style={{ backgroundImage: `url(${photo.image_url})` }}
+                />
+                <button
+                  type="button"
+                  onClick={() => onDeletePhoto(photo)}
+                  className="w-full border-t border-neutral-200 px-3 py-2 text-xs font-semibold text-red-700"
+                >
+                  Delete photo
+                </button>
+              </div>
+            ))
         ) : (
-          <EmptyLine text="No vendor photos in the database yet." />
+          <EmptyLine text="Create a vendor profile before uploading photos." />
         )}
+        {selectedVendor &&
+        photos.filter((photo) => photo.vendor_id === selectedVendor.id).length === 0 ? (
+          <EmptyLine text="No photos for this vendor yet." />
+        ) : null}
       </div>
     </Panel>
   );
@@ -446,11 +713,20 @@ export function BookingsTab({ bookings }: Pick<VendorTabProps, "bookings">) {
     <Panel title="Confirmed bookings">
       {bookings.length ? (
         bookings.map((booking) => (
-          <Row
+          <Link
             key={booking.id}
-            title={formatMoney(booking.final_price)}
-            detail={`${booking.booking_status} - deposit ${formatMoney(booking.deposit_amount)} - balance ${formatMoney(booking.balance_due)}`}
-          />
+            href={`/bookings/${booking.id}`}
+            className="block rounded-lg border border-neutral-200 p-4 transition hover:border-neutral-950"
+          >
+            <p className="font-semibold text-neutral-950">
+              {formatMoney(booking.final_price)}
+            </p>
+            <p className="mt-1 text-sm text-neutral-500">
+              {booking.booking_status} - deposit{" "}
+              {formatMoney(booking.deposit_amount)} - balance{" "}
+              {formatMoney(booking.balance_due)}
+            </p>
+          </Link>
         ))
       ) : (
         <EmptyLine text="No bookings yet. Accepted quotes become bookings when planners confirm." />
