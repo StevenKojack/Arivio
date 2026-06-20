@@ -92,4 +92,46 @@ export async function getBookingsForVendors(
   return data ?? [];
 }
 
+export async function getBookingById(
+  supabase: ArivioSupabaseClient,
+  bookingId: string,
+) {
+  const { data, error } = await supabase
+    .from("bookings")
+    .select("*")
+    .eq("id", bookingId)
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+export async function updateBookingNotes(
+  supabase: ArivioSupabaseClient,
+  input: {
+    bookingId: string;
+    plannerNotes?: string | null;
+    vendorNotes?: string | null;
+  },
+) {
+  const { data, error } = await supabase
+    .from("bookings")
+    .update({
+      planner_notes: input.plannerNotes,
+      vendor_notes: input.vendorNotes,
+    })
+    .eq("id", input.bookingId)
+    .select("*")
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
 export type BookingRow = PublicTableRow<"bookings">;

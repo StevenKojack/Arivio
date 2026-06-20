@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { MarketplaceCard } from "../components/MarketplaceCard";
 import {
@@ -39,6 +39,7 @@ import { requestQuotesFromCart } from "@/lib/services/quoteService";
 type MarketplaceFilter = (typeof marketplaceTypes)[number];
 type EventRow = PublicTableRow<"events">;
 type ProfileRow = PublicTableRow<"profiles">;
+const PAGE_SIZE = 8;
 type CartLine = {
   cartItemId?: string;
   id: number;
@@ -107,8 +108,12 @@ export function MarketplaceBrowser() {
   const [selectedVenueId, setSelectedVenueId] = useState<number | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [cartMessage, setCartMessage] = useState("");
+  const [page, setPage] = useState(1);
   const [isRequestingQuotes, setIsRequestingQuotes] = useState(false);
-  const venueItems = providers.filter((item) => item.type === "Venue");
+  const venueItems = useMemo(
+    () => providers.filter((item) => item.type === "Venue"),
+    [providers],
+  );
   const durationHours = getHoursBetween(startTime, endTime);
   const globalQuoteContext: QuoteContext = {
     date: eventDate,
@@ -122,29 +127,43 @@ export function MarketplaceBrowser() {
     : undefined;
   const homeArea = homeAreas.find((area) => area.name === homeAreaName) ?? homeAreas[0];
   const homeCoordinates = liveCoordinates ?? homeArea.coordinates;
-  const eventCoordinates: Coordinates | undefined = useHomeVenue
-    ? homeCoordinates
-    : selectedVenue?.coordinates ??
-      (savedEvent?.latitude && savedEvent.longitude
-        ? { lat: savedEvent.latitude, lng: savedEvent.longitude }
-        : undefined);
-  const providerEstimates = eventCoordinates
-    ? providers
-        .filter((item) => item.type !== "Venue")
-        .map((item) => ({
-          driveMinutes: estimateDriveMinutes(eventCoordinates, item.coordinates),
-          item,
-          miles: getDistanceMiles(eventCoordinates, item.coordinates),
-        }))
-        .filter((estimate) => {
-          const withinRadius = estimate.item.serviceRadiusMiles
-            ? estimate.miles <= estimate.item.serviceRadiusMiles
-            : true;
+  const eventCoordinates: Coordinates | undefined = useMemo(
+    () =>
+      useHomeVenue
+        ? homeCoordinates
+        : selectedVenue?.coordinates ??
+          (savedEvent?.latitude && savedEvent.longitude
+            ? { lat: savedEvent.latitude, lng: savedEvent.longitude }
+            : undefined),
+    [
+      homeCoordinates,
+      savedEvent?.latitude,
+      savedEvent?.longitude,
+      selectedVenue?.coordinates,
+      useHomeVenue,
+    ],
+  );
+  const providerEstimates = useMemo(
+    () =>
+      eventCoordinates
+        ? providers
+            .filter((item) => item.type !== "Venue")
+            .map((item) => ({
+              driveMinutes: estimateDriveMinutes(eventCoordinates, item.coordinates),
+              item,
+              miles: getDistanceMiles(eventCoordinates, item.coordinates),
+            }))
+            .filter((estimate) => {
+              const withinRadius = estimate.item.serviceRadiusMiles
+                ? estimate.miles <= estimate.item.serviceRadiusMiles
+                : true;
 
-          return estimate.driveMinutes <= 60 && withinRadius;
-        })
-        .sort((a, b) => a.driveMinutes - b.driveMinutes)
-    : [];
+              return estimate.driveMinutes <= 60 && withinRadius;
+            })
+            .sort((a, b) => a.driveMinutes - b.driveMinutes)
+        : [],
+    [eventCoordinates, providers],
+  );
   const visibleMarketplaceTypes =
     showAllServiceFilters || selectedEvent === "All"
       ? marketplaceTypes
@@ -162,7 +181,8 @@ export function MarketplaceBrowser() {
   ]
     .filter(Boolean)
     .join(" - ");
-  const filteredItems = providers.filter((item) => {
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredItems = useMemo(() => providers.filter((item) => {
     const matchesType = selectedType === "All" || item.type === selectedType;
     const matchesEvent =
       selectedEvent === "All" || item.events.includes(selectedEvent);
@@ -172,7 +192,8 @@ export function MarketplaceBrowser() {
     const searchText = `${item.name} ${item.location} ${item.address} ${item.events.join(
       " ",
     )} ${item.services.join(" ")}`;
-    const matchesQuery = searchText.toLowerCase().includes(query.toLowerCase());
+    const matchesQuery =
+      !normalizedQuery || searchText.toLowerCase().includes(normalizedQuery);
     const driveMinutes = eventCoordinates
       ? estimateDriveMinutes(eventCoordinates, item.coordinates)
       : 0;
@@ -208,7 +229,24 @@ export function MarketplaceBrowser() {
       isNearEnough &&
       matchesAvailability
     );
-  });
+  }), [
+    endTime,
+    eventCoordinates,
+    eventDate,
+    normalizedQuery,
+    providers,
+    savedEvent?.city,
+    selectedEvent,
+    selectedServices,
+    selectedType,
+    startTime,
+  ]);
+  const totalPages = Math.max(Math.ceil(filteredItems.length / PAGE_SIZE), 1);
+  const currentPage = Math.min(page, totalPages);
+  const pagedItems = filteredItems.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
   const cartTotal = cart.reduce((total, line) => total + getLineQuote(line), 0);
   const canSaveCart = Boolean(profile && savedEvent);
 
@@ -761,18 +799,47 @@ export function MarketplaceBrowser() {
         </div>
 
         {filteredItems.length ? (
-          <div className="mt-8 grid animate-[fadeUp_280ms_ease-out] gap-5 md:grid-cols-2">
-            {filteredItems.map((item) => (
-              <MarketplaceCard
-                key={item.id}
-                available={isAvailableAt(item, eventDate, startTime, endTime)}
-                driveMinutes={getDriveMinutes(item)}
-                item={item}
-                quote={quoteItem(item, globalQuoteContext)}
-                onAdd={addToCart}
-              />
-            ))}
-          </div>
+          <>
+            <div className="mt-8 flex flex-col justify-between gap-3 rounded-lg border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-600 sm:flex-row sm:items-center">
+              <p>
+                Showing {(currentPage - 1) * PAGE_SIZE + 1}-
+                {Math.min(currentPage * PAGE_SIZE, filteredItems.length)} of{" "}
+                {filteredItems.length} providers
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPage((current) => Math.max(current - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="h-9 rounded-full border border-neutral-300 px-4 text-xs font-semibold text-neutral-950 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPage((current) => Math.min(current + 1, totalPages))
+                  }
+                  disabled={currentPage === totalPages}
+                  className="h-9 rounded-full border border-neutral-300 px-4 text-xs font-semibold text-neutral-950 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+            <div className="mt-5 grid animate-[fadeUp_280ms_ease-out] gap-5 md:grid-cols-2">
+              {pagedItems.map((item) => (
+                <MarketplaceCard
+                  key={item.id}
+                  available={isAvailableAt(item, eventDate, startTime, endTime)}
+                  driveMinutes={getDriveMinutes(item)}
+                  item={item}
+                  quote={quoteItem(item, globalQuoteContext)}
+                  onAdd={addToCart}
+                />
+              ))}
+            </div>
+          </>
         ) : (
           <div className="mt-8 rounded-lg border border-dashed border-neutral-300 bg-white p-8 text-center">
             <h2 className="text-2xl font-semibold tracking-tight text-neutral-950">
