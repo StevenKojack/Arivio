@@ -6,6 +6,7 @@ import {
   allServices,
   eventPlanPresets,
   eventTypes,
+  getHoursBetween,
   type EventType,
   type ServiceName,
 } from "../data/marketplace";
@@ -16,7 +17,7 @@ export function PlannerForm() {
   const [budget, setBudget] = useState(5000);
   const [eventDate, setEventDate] = useState("");
   const [startTime, setStartTime] = useState("14:00");
-  const [durationHours, setDurationHours] = useState(3);
+  const [endTime, setEndTime] = useState("17:00");
   const [needsVenue, setNeedsVenue] = useState(true);
   const [showMore, setShowMore] = useState(false);
   const [services, setServices] = useState<ServiceName[]>(
@@ -57,7 +58,7 @@ export function PlannerForm() {
       guests: String(guestCount),
       budget: String(budget),
       date: eventDate,
-      duration: String(durationHours),
+      duration: String(getHoursBetween(startTime, endTime)),
       time: startTime,
     });
 
@@ -69,7 +70,7 @@ export function PlannerForm() {
   }, [
     activeServices,
     budget,
-    durationHours,
+    endTime,
     eventDate,
     eventType,
     guestCount,
@@ -163,13 +164,11 @@ export function PlannerForm() {
             />
           </label>
           <label className="flex flex-col gap-2 text-sm font-semibold text-neutral-800">
-            Service hours
+            Party end
             <input
-              type="number"
-              min="1"
-              max="12"
-              value={durationHours}
-              onChange={(event) => setDurationHours(Number(event.target.value))}
+              type="time"
+              value={endTime}
+              onChange={(event) => setEndTime(event.target.value)}
               className="h-12 rounded-lg border border-neutral-300 px-4 text-sm font-medium outline-none transition focus:border-neutral-950"
             />
           </label>
@@ -290,7 +289,7 @@ export function PlannerForm() {
           <div className="rounded-lg border border-white/10 p-4">
             <p className="text-sm text-neutral-400">Booking window</p>
             <p className="mt-1 text-base font-semibold">
-              {eventDate || "Choose date"} at {startTime} for {durationHours}h
+              {eventDate || "Choose date"} from {startTime} to {endTime}
             </p>
           </div>
           <div className="rounded-lg border border-white/10 p-4">

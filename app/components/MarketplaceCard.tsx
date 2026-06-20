@@ -5,6 +5,7 @@ import type { MarketplaceItem } from "../data/marketplace";
 type MarketplaceCardProps = {
   available: boolean;
   buttonLabel?: string;
+  driveMinutes?: number;
   item: MarketplaceItem;
   quote: number;
   onAdd: (item: MarketplaceItem) => void;
@@ -13,6 +14,7 @@ type MarketplaceCardProps = {
 export function MarketplaceCard({
   available,
   buttonLabel = "Add to cart",
+  driveMinutes,
   item,
   quote,
   onAdd,
@@ -35,6 +37,7 @@ export function MarketplaceCard({
           </span>
         </div>
         <p className="mt-3 text-sm font-medium text-neutral-500">{item.location}</p>
+        <p className="mt-1 text-xs text-neutral-400">{item.address}</p>
         <p className="mt-4 flex-1 text-sm leading-6 text-neutral-600">
           {item.description}
         </p>
@@ -81,9 +84,23 @@ export function MarketplaceCard({
             </span>
           </div>
           <p className="mt-2 text-xs text-neutral-500">{item.pricing.label}</p>
+          {typeof driveMinutes === "number" ? (
+            <p className="mt-2 text-xs font-semibold text-neutral-700">
+              About {driveMinutes} min normal traffic from venue
+            </p>
+          ) : null}
         </div>
 
-        <div className="mt-5 flex items-center justify-between border-t border-neutral-100 pt-4">
+        <div className="mt-5 border-t border-neutral-100 pt-4">
+          <a
+            href={item.sourceUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mb-4 inline-flex text-xs font-semibold text-[#c33d38] transition hover:text-neutral-950"
+          >
+            Verify: {item.sourceLabel}
+          </a>
+          <div className="flex items-center justify-between">
           <div>
             <p className="text-xs text-neutral-500">Listed from</p>
             <p className="text-lg font-semibold text-neutral-950">{item.price}</p>
@@ -95,6 +112,7 @@ export function MarketplaceCard({
           >
             {buttonLabel}
           </button>
+          </div>
         </div>
       </div>
     </article>

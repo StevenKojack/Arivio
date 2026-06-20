@@ -1,15 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { MarketplaceCard } from "../components/MarketplaceCard";
 import {
   entertainmentServices,
+  estimateDriveMinutes,
   eventTypes,
+  getEndTime,
+  getHoursBetween,
+  homeAreas,
   isAvailableAt,
   marketplaceItems,
   marketplaceTypes,
   quoteItem,
+  type Coordinates,
   type EventType,
   type MarketplaceItem,
   type QuoteContext,
@@ -20,8 +25,10 @@ type MarketplaceFilter = (typeof marketplaceTypes)[number];
 type CartLine = {
   id: number;
   item: MarketplaceItem;
-  quote: number;
+  serviceEnd: string;
+  serviceStart: string;
 };
+const venueItems = marketplaceItems.filter((item) => item.type === "Venue");
 
 function isEventType(value: string | null): value is EventType {
   return eventTypes.includes(value as EventType);
@@ -50,17 +57,40 @@ export function MarketplaceBrowser() {
   const [query, setQuery] = useState("");
   const [eventDate, setEventDate] = useState(searchParams.get("date") ?? "");
   const [startTime, setStartTime] = useState(searchParams.get("time") ?? "14:00");
-  const [durationHours, setDurationHours] = useState(
-    Number(searchParams.get("duration") ?? 3),
+  const [endTime, setEndTime] = useState(
+    getEndTime(searchParams.get("time") ?? "14:00", Number(searchParams.get("duration") ?? 3)),
   );
-  const [guestCount, setGuestCount] = useState(Number.isFinite(initialGuests) ? initialGuests : 40);
+  const [guestCount, setGuestCount] = useState(
+    Number.isFinite(initialGuests) ? initialGuests : 40,
+  );
+  const [useHomeVenue, setUseHomeVenue] = useState(false);
+  const [homeAddress, setHomeAddress] = useState("");
+  const [homeAreaName, setHomeAreaName] = useState(homeAreas[0].name);
+  const [selectedVenueId, setSelectedVenueId] = useState<number | null>(() => {
+    if (!isEventType(initialEvent)) {
+      return null;
+    }
+
+    return (
+      venueItems.find((venue) => venue.events.includes(initialEvent))?.id ?? null
+    );
+  });
   const [cart, setCart] = useState<CartLine[]>([]);
-  const quoteContext: QuoteContext = {
+  const durationHours = getHoursBetween(startTime, endTime);
+  const globalQuoteContext: QuoteContext = {
     date: eventDate,
     durationHours,
+    endTime,
     guests: guestCount,
     startTime,
   };
+  const selectedVenue = selectedVenueId
+    ? venueItems.find((venue) => venue.id === selectedVenueId)
+    : undefined;
+  const homeArea = homeAreas.find((area) => area.name === homeAreaName) ?? homeAreas[0];
+  const eventCoordinates: Coordinates | undefined = useHomeVenue
+    ? homeArea.coordinates
+    : selectedVenue?.coordinates;
   const planSummary = [
     isEventType(initialEvent) ? initialEvent : null,
     guestCount ? `${guestCount.toLocaleString()} guests` : null,
@@ -69,23 +99,54 @@ export function MarketplaceBrowser() {
     .filter(Boolean)
     .join(" - ");
 
-  const filteredItems = useMemo(() => {
-    return marketplaceItems.filter((item) => {
-      const matchesType = selectedType === "All" || item.type === selectedType;
-      const matchesEvent =
-        selectedEvent === "All" || item.events.includes(selectedEvent);
-      const matchesServices =
-        selectedServices.length === 0 ||
-        item.services.some((service) => selectedServices.includes(service));
-      const searchText = `${item.name} ${item.location} ${item.events.join(
-        " ",
-      )} ${item.services.join(" ")}`;
-      const matchesQuery = searchText.toLowerCase().includes(query.toLowerCase());
+  const filteredItems = marketplaceItems.filter((item) => {
+    const matchesType = selectedType === "All" || item.type === selectedType;
+    const matchesEvent =
+      selectedEvent === "All" || item.events.includes(selectedEvent);
+    const matchesServices =
+      selectedServices.length === 0 ||
+      item.services.some((service) => selectedServices.includes(service));
+    const searchText = `${item.name} ${item.location} ${item.address} ${item.events.join(
+      " ",
+    )} ${item.services.join(" ")}`;
+    const matchesQuery = searchText.toLowerCase().includes(query.toLowerCase());
+    const driveMinutes = eventCoordinates
+      ? estimateDriveMinutes(eventCoordinates, item.coordinates)
+      : 0;
+    const isNearEnough =
+      !eventCoordinates || item.type === "Venue" || driveMinutes <= 60;
 
-      return matchesType && matchesEvent && matchesServices && matchesQuery;
-    });
-  }, [query, selectedEvent, selectedServices, selectedType]);
-  const cartTotal = cart.reduce((total, line) => total + line.quote, 0);
+    return (
+      matchesType &&
+      matchesEvent &&
+      matchesServices &&
+      matchesQuery &&
+      isNearEnough
+    );
+  });
+  const cartTotal = cart.reduce((total, line) => total + getLineQuote(line), 0);
+
+  function getLineContext(line: CartLine): QuoteContext {
+    return {
+      date: eventDate,
+      durationHours: getHoursBetween(line.serviceStart, line.serviceEnd),
+      endTime: line.serviceEnd,
+      guests: guestCount,
+      startTime: line.serviceStart,
+    };
+  }
+
+  function getLineQuote(line: CartLine) {
+    return quoteItem(line.item, getLineContext(line));
+  }
+
+  function getDriveMinutes(item: MarketplaceItem) {
+    if (!eventCoordinates || item.type === "Venue") {
+      return undefined;
+    }
+
+    return estimateDriveMinutes(eventCoordinates, item.coordinates);
+  }
 
   function toggleService(service: ServiceName) {
     setSelectedServices((current) =>
@@ -96,16 +157,20 @@ export function MarketplaceBrowser() {
   }
 
   function addToCart(item: MarketplaceItem) {
-    const quote = quoteItem(item, quoteContext);
-
     setCart((current) => {
       if (current.some((line) => line.item.id === item.id)) {
-        return current.map((line) =>
-          line.item.id === item.id ? { ...line, quote } : line,
-        );
+        return current;
       }
 
-      return [...current, { id: Date.now(), item, quote }];
+      return [
+        ...current,
+        {
+          id: Date.now(),
+          item,
+          serviceEnd: endTime,
+          serviceStart: startTime,
+        },
+      ];
     });
   }
 
@@ -113,8 +178,16 @@ export function MarketplaceBrowser() {
     setCart((current) => current.filter((line) => line.item.id !== itemId));
   }
 
+  function updateCartTime(itemId: number, field: "serviceStart" | "serviceEnd", value: string) {
+    setCart((current) =>
+      current.map((line) =>
+        line.item.id === itemId ? { ...line, [field]: value } : line,
+      ),
+    );
+  }
+
   return (
-    <div className="grid gap-8 xl:grid-cols-[1fr_360px]">
+    <div className="grid gap-8 xl:grid-cols-[1fr_380px]">
       <div>
         <div className="rounded-lg border border-neutral-200 bg-white p-4 shadow-[0_18px_44px_rgba(20,20,20,0.05)]">
           {planSummary ? (
@@ -122,11 +195,12 @@ export function MarketplaceBrowser() {
               Matches for {planSummary}
             </div>
           ) : null}
+
           <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search by name, city, event, or service"
+              placeholder="Search by name, city, event, address, or service"
               className="h-12 rounded-lg border border-neutral-300 px-4 text-sm font-medium outline-none transition focus:border-neutral-950"
             />
             <select
@@ -154,7 +228,7 @@ export function MarketplaceBrowser() {
               />
             </label>
             <label className="text-xs font-semibold uppercase tracking-[0.12em] text-neutral-500">
-              Start time
+              Party start
               <input
                 value={startTime}
                 onChange={(event) => setStartTime(event.target.value)}
@@ -163,13 +237,11 @@ export function MarketplaceBrowser() {
               />
             </label>
             <label className="text-xs font-semibold uppercase tracking-[0.12em] text-neutral-500">
-              Hours
+              Party end
               <input
-                value={durationHours}
-                onChange={(event) => setDurationHours(Number(event.target.value))}
-                type="number"
-                min="1"
-                max="12"
+                value={endTime}
+                onChange={(event) => setEndTime(event.target.value)}
+                type="time"
                 className="mt-2 h-11 w-full rounded-lg border border-neutral-300 px-3 text-sm font-semibold normal-case tracking-normal text-neutral-900 outline-none focus:border-neutral-950"
               />
             </label>
@@ -183,6 +255,78 @@ export function MarketplaceBrowser() {
                 className="mt-2 h-11 w-full rounded-lg border border-neutral-300 px-3 text-sm font-semibold normal-case tracking-normal text-neutral-900 outline-none focus:border-neutral-950"
               />
             </label>
+          </div>
+
+          <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_1fr]">
+            <div className="rounded-lg border border-neutral-200 bg-[#fbfbfa] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-neutral-950">
+                    Party venue
+                  </p>
+                  <p className="mt-1 text-sm text-neutral-600">
+                    Pick a venue or use your home so providers stay within an
+                    estimated one-hour drive.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setUseHomeVenue((current) => !current)}
+                  className={`h-10 rounded-full px-4 text-sm font-semibold transition ${
+                    useHomeVenue
+                      ? "bg-neutral-950 text-white"
+                      : "border border-neutral-300 bg-white text-neutral-800"
+                  }`}
+                >
+                  Use my home
+                </button>
+              </div>
+
+              {useHomeVenue ? (
+                <div className="mt-4 grid gap-3">
+                  <input
+                    value={homeAddress}
+                    onChange={(event) => setHomeAddress(event.target.value)}
+                    placeholder="Home address"
+                    className="h-11 rounded-lg border border-neutral-300 px-3 text-sm font-semibold text-neutral-900 outline-none focus:border-neutral-950"
+                  />
+                  <select
+                    value={homeAreaName}
+                    onChange={(event) => setHomeAreaName(event.target.value)}
+                    className="h-11 rounded-lg border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-900 outline-none focus:border-neutral-950"
+                  >
+                    {homeAreas.map((area) => (
+                      <option key={area.name}>{area.name}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <select
+                  value={selectedVenueId ?? ""}
+                  onChange={(event) =>
+                    setSelectedVenueId(
+                      event.target.value ? Number(event.target.value) : null,
+                    )
+                  }
+                  className="mt-4 h-11 w-full rounded-lg border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-900 outline-none focus:border-neutral-950"
+                >
+                  <option value="">Select a venue from the map</option>
+                  {venueItems.map((venue) => (
+                    <option key={venue.id} value={venue.id}>
+                      {venue.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            <VenueMap
+              selectedVenueId={selectedVenueId}
+              useHomeVenue={useHomeVenue}
+              homeCoordinates={homeArea.coordinates}
+              venues={venueItems}
+              onSelectVenue={setSelectedVenueId}
+            />
           </div>
 
           <div className="mt-5 rounded-lg border border-[#ffd6d7] bg-[#fff8f8] p-4">
@@ -253,9 +397,10 @@ export function MarketplaceBrowser() {
             {filteredItems.map((item) => (
               <MarketplaceCard
                 key={item.id}
-                available={isAvailableAt(item, eventDate, startTime)}
+                available={isAvailableAt(item, eventDate, startTime, endTime)}
+                driveMinutes={getDriveMinutes(item)}
                 item={item}
-                quote={quoteItem(item, quoteContext)}
+                quote={quoteItem(item, globalQuoteContext)}
                 onAdd={addToCart}
               />
             ))}
@@ -263,11 +408,12 @@ export function MarketplaceBrowser() {
         ) : (
           <div className="mt-8 rounded-lg border border-dashed border-neutral-300 bg-white p-8 text-center">
             <h2 className="text-2xl font-semibold tracking-tight text-neutral-950">
-              No exact matches yet
+              No providers within one hour
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-neutral-600">
-              Try clearing one service tag or switching the event filter. Arivio
-              will keep expanding the marketplace as more providers join.
+              Try a closer venue, a different home area, or clear one of the
+              service filters. Arivio currently hides providers estimated to be
+              more than one hour away in normal traffic.
             </p>
           </div>
         )}
@@ -290,43 +436,110 @@ export function MarketplaceBrowser() {
 
         <div className="mt-5 rounded-lg border border-white/10 bg-white/5 p-4 text-sm text-neutral-300">
           <p>
-            {eventDate || "Choose a date"} at {startTime}, {durationHours}{" "}
-            {durationHours === 1 ? "hour" : "hours"}
+            {eventDate || "Choose a date"} from {startTime} to {endTime}
           </p>
           <p className="mt-1">{guestCount.toLocaleString()} guests</p>
+          <p className="mt-1">
+            Venue:{" "}
+            {useHomeVenue
+              ? homeAddress || homeAreaName
+              : selectedVenue?.name || "not selected"}
+          </p>
         </div>
 
         <div className="mt-5 space-y-3">
           {cart.length ? (
-            cart.map((line) => (
-              <div
-                key={line.item.id}
-                className="rounded-lg border border-white/10 bg-white p-4 text-neutral-950"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold">{line.item.name}</p>
-                    <p className="mt-1 text-xs font-medium text-neutral-500">
-                      {line.item.type} - {line.item.pricing.label}
-                    </p>
+            cart.map((line) => {
+              const lineQuote = getLineQuote(line);
+              const lineAvailable = isAvailableAt(
+                line.item,
+                eventDate,
+                line.serviceStart,
+                line.serviceEnd,
+              );
+
+              return (
+                <div
+                  key={line.item.id}
+                  className="rounded-lg border border-white/10 bg-white p-4 text-neutral-950"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold">{line.item.name}</p>
+                      <p className="mt-1 text-xs font-medium text-neutral-500">
+                        {line.item.type} - {line.item.pricing.label}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeFromCart(line.item.id)}
+                      className="text-xs font-semibold text-neutral-500 transition hover:text-neutral-950"
+                    >
+                      Remove
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => removeFromCart(line.item.id)}
-                    className="text-xs font-semibold text-neutral-500 transition hover:text-neutral-950"
-                  >
-                    Remove
-                  </button>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-500">
+                      Start
+                      <input
+                        type="time"
+                        value={line.serviceStart}
+                        onChange={(event) =>
+                          updateCartTime(
+                            line.item.id,
+                            "serviceStart",
+                            event.target.value,
+                          )
+                        }
+                        className="mt-1 h-9 w-full rounded-md border border-neutral-200 px-2 text-sm text-neutral-950"
+                      />
+                    </label>
+                    <label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-500">
+                      End
+                      <input
+                        type="time"
+                        value={line.serviceEnd}
+                        onChange={(event) =>
+                          updateCartTime(
+                            line.item.id,
+                            "serviceEnd",
+                            event.target.value,
+                          )
+                        }
+                        className="mt-1 h-9 w-full rounded-md border border-neutral-200 px-2 text-sm text-neutral-950"
+                      />
+                    </label>
+                  </div>
+                  <div className="mt-3 flex items-end justify-between gap-3">
+                    <div>
+                      <p className="text-xl font-semibold">
+                        ${lineQuote.toLocaleString()}
+                      </p>
+                      <p
+                        className={`mt-1 text-xs font-semibold ${
+                          lineAvailable ? "text-emerald-700" : "text-amber-700"
+                        }`}
+                      >
+                        {lineAvailable ? "Available for this window" : "Check this time"}
+                      </p>
+                    </div>
+                    <a
+                      href={line.item.sourceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs font-semibold text-[#c33d38]"
+                    >
+                      Source
+                    </a>
+                  </div>
                 </div>
-                <p className="mt-3 text-xl font-semibold">
-                  ${line.quote.toLocaleString()}
-                </p>
-              </div>
-            ))
+              );
+            })
           ) : (
             <div className="rounded-lg border border-dashed border-white/20 p-5 text-sm leading-6 text-neutral-300">
-              Add vendors to see an itemized estimate. Quotes update from the
-              selected date, time, duration, and guest count.
+              Add vendors to see an itemized estimate. Each provider can have a
+              different start and end time, so entertainment can cover only part
+              of the party.
             </div>
           )}
         </div>
@@ -344,6 +557,69 @@ export function MarketplaceBrowser() {
           </button>
         </div>
       </aside>
+    </div>
+  );
+}
+
+type VenueMapProps = {
+  homeCoordinates: Coordinates;
+  onSelectVenue: (id: number) => void;
+  selectedVenueId: number | null;
+  useHomeVenue: boolean;
+  venues: MarketplaceItem[];
+};
+
+function VenueMap({
+  homeCoordinates,
+  onSelectVenue,
+  selectedVenueId,
+  useHomeVenue,
+  venues,
+}: VenueMapProps) {
+  const points = useHomeVenue
+    ? [{ id: 0, name: "Home venue", coordinates: homeCoordinates }]
+    : venues;
+  const lats = points.map((point) => point.coordinates.lat);
+  const lngs = points.map((point) => point.coordinates.lng);
+  const minLat = Math.min(...lats);
+  const maxLat = Math.max(...lats);
+  const minLng = Math.min(...lngs);
+  const maxLng = Math.max(...lngs);
+
+  function toPosition(point: Coordinates) {
+    const x = ((point.lng - minLng) / Math.max(maxLng - minLng, 0.01)) * 74 + 13;
+    const y = 87 - ((point.lat - minLat) / Math.max(maxLat - minLat, 0.01)) * 74;
+
+    return { x, y };
+  }
+
+  return (
+    <div className="relative min-h-64 overflow-hidden rounded-lg border border-neutral-200 bg-[#eef3ef] p-4">
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.42)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.42)_1px,transparent_1px)] bg-[size:36px_36px]" />
+      <div className="absolute left-4 top-4 z-10 rounded-full bg-white px-3 py-1 text-xs font-semibold text-neutral-700 shadow">
+        Venue map
+      </div>
+      <div className="absolute bottom-4 left-4 z-10 rounded-lg bg-white/90 px-3 py-2 text-xs font-medium text-neutral-600 shadow">
+        Map is a local prototype view. Pins use stored LA coordinates.
+      </div>
+      {points.map((point) => {
+        const position = toPosition(point.coordinates);
+        const isSelected = point.id === selectedVenueId || useHomeVenue;
+
+        return (
+          <button
+            key={point.id}
+            type="button"
+            onClick={() => !useHomeVenue && onSelectVenue(point.id)}
+            className={`absolute z-20 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white px-3 py-2 text-xs font-semibold shadow-[0_12px_30px_rgba(20,20,20,0.2)] transition hover:-translate-y-[55%] ${
+              isSelected ? "bg-[#ff5a5f] text-white" : "bg-neutral-950 text-white"
+            }`}
+            style={{ left: `${position.x}%`, top: `${position.y}%` }}
+          >
+            {point.name}
+          </button>
+        );
+      })}
     </div>
   );
 }
