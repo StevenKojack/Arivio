@@ -12,6 +12,14 @@ import type {
   UserRole,
 } from "../types/domain";
 
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
+
 type RowWithTimestamps = {
   created_at: string;
 };
@@ -223,14 +231,17 @@ export type Database = {
         Row: RowWithTimestamps & {
           balance_due: number;
           booking_status: BookingStatus;
+          booking_timeline: Json | null;
           deposit_amount: number;
           event_id: string;
           final_price: number;
           id: string;
           payment_status: PaymentStatus;
+          planner_notes: string | null;
           planner_id: string;
           quote_request_id: string | null;
           service_id: string | null;
+          vendor_notes: string | null;
           vendor_id: string | null;
           venue_id: string | null;
         };

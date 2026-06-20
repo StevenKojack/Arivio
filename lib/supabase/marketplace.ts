@@ -14,6 +14,7 @@ type TypedSupabaseClient = SupabaseClient<Database>;
 type VendorBusinessRow = PublicTableRow<"vendor_businesses">;
 type VendorServiceRow = PublicTableRow<"vendor_services">;
 type VendorAvailabilityRow = PublicTableRow<"vendor_availability">;
+type VendorPhotoRow = PublicTableRow<"vendor_photos">;
 type EventRow = PublicTableRow<"events">;
 type CartItemRow = PublicTableRow<"cart_items">;
 
@@ -88,9 +89,10 @@ export async function getMarketplaceProviders(supabase: TypedSupabaseClient) {
     return [];
   }
 
-  const [services, availabilityByVendor] = await Promise.all([
+  const [services, availabilityByVendor, photosByVendor] = await Promise.all([
     getVendorServices(supabase, vendorIds),
     getAvailabilityByVendor(supabase, vendorIds),
+    getPhotosByVendor(supabase, vendorIds),
   ]);
   const vendorById = new Map(vendors.map((vendor) => [vendor.id, vendor]));
 
@@ -106,6 +108,7 @@ export async function getMarketplaceProviders(supabase: TypedSupabaseClient) {
         vendor,
         service,
         availabilityByVendor.get(vendor.id) ?? [],
+        photosByVendor.get(vendor.id) ?? [],
         index,
       );
     })
@@ -260,6 +263,7 @@ function mapServiceToMarketplaceItem(
   vendor: VendorBusinessRow,
   service: VendorServiceRow,
   availability: VendorAvailabilityRow[],
+  photos: VendorPhotoRow[],
   index: number,
 ): MarketplaceItem {
   const type = toServiceName(service.category);
@@ -274,6 +278,9 @@ function mapServiceToMarketplaceItem(
   return {
     address: vendor.base_address ?? city,
     availability: toAvailabilityWindows(availability),
+    blockedDates: availability
+      .filter((row) => row.status === "blocked")
+      .map((row) => row.date),
     coordinates: {
       lat: vendor.latitude ?? 34.0522 + index * 0.004,
       lng: vendor.longitude ?? -118.2437 - index * 0.004,
@@ -287,6 +294,7 @@ function mapServiceToMarketplaceItem(
     id: numericId(service.id),
     location: city,
     name: service.service_name || vendor.business_name,
+    photoUrl: photos[0]?.image_url ?? null,
     price: basePrice,
     pricing,
     rating: 4.85,
@@ -301,6 +309,28 @@ function mapServiceToMarketplaceItem(
   };
 }
 
+async function getPhotosByVendor(
+  supabase: TypedSupabaseClient,
+  vendorIds: string[],
+) {
+  const { data, error } = await supabase
+    .from("vendor_photos")
+    .select("*")
+    .in("vendor_id", vendorIds)
+    .order("sort_order", { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).reduce((map, row) => {
+    const rows = map.get(row.vendor_id) ?? [];
+    rows.push(row);
+    map.set(row.vendor_id, rows);
+    return map;
+  }, new Map<string, VendorPhotoRow[]>());
+}
+
 async function getAvailabilityByVendor(
   supabase: TypedSupabaseClient,
   vendorIds: string[],
@@ -308,8 +338,7 @@ async function getAvailabilityByVendor(
   const { data, error } = await supabase
     .from("vendor_availability")
     .select("*")
-    .in("vendor_id", vendorIds)
-    .eq("status", "available");
+    .in("vendor_id", vendorIds);
 
   if (error) {
     throw error;
@@ -367,7 +396,9 @@ function toPricingModel(service: VendorServiceRow): PricingModel {
 function toAvailabilityWindows(
   availability: VendorAvailabilityRow[],
 ): AvailabilityWindow[] {
-  if (!availability.length) {
+  const availableWindows = availability.filter((row) => row.status === "available");
+
+  if (!availableWindows.length) {
     return [
       {
         days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
@@ -377,7 +408,7 @@ function toAvailabilityWindows(
     ];
   }
 
-  return availability.map((row) => ({
+  return availableWindows.map((row) => ({
     days: [
       new Intl.DateTimeFormat("en-US", { weekday: "short" }).format(
         new Date(`${row.date}T12:00:00`),

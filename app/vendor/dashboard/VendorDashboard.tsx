@@ -2,23 +2,55 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { eventTypes } from "@/app/data/marketplace";
 import { createBrowserSupabaseClient, hasSupabaseConfig } from "@/lib/supabase/client";
-import type { PublicTableRow } from "@/lib/supabase/database.types";
-import { ensureCurrentProfile } from "@/lib/supabase/profiles";
+import { getEventsByIds } from "@/lib/repositories/eventsRepository";
+import { ensureCurrentProfile } from "@/lib/repositories/profilesRepository";
+import { getBookingsForVendors, type BookingRow } from "@/lib/repositories/bookingsRepository";
+import { getQuoteRequestsForVendors } from "@/lib/repositories/quotesRepository";
+import {
+  createAvailabilityWindow,
+  createVendorService,
+  getVendorAvailabilityByVendorIds,
+  getVendorBusinessesByOwner,
+  getVendorPhotosByVendorIds,
+  getVendorServicesByVendorIds,
+  updateVendorBusiness,
+  updateVendorService,
+  type VendorAvailabilityRow,
+  type VendorBusinessRow,
+  type VendorPhotoRow,
+  type VendorServiceRow,
+} from "@/lib/repositories/vendorsRepository";
+import { respondToQuoteRequest } from "@/lib/services/quoteService";
+import { optionalUrl, requirePositiveNumber, requireString } from "@/lib/validators/forms";
+import {
+  AnalyticsTab,
+  AvailabilityTab,
+  BookingsTab,
+  BusinessSettingsTab,
+  DashboardTab,
+  PhotosTab,
+  ProfileTab,
+  QuotesTab,
+  ServicesTab,
+  vendorDashboardTabs,
+  type AvailabilityDraft,
+  type BusinessDraft,
+  type QuoteWithEvent,
+  type ServiceDraft,
+  type VendorDashboardTab,
+} from "./VendorDashboardTabs";
 import type { QuoteStatus } from "@/lib/types/domain";
 
-type VendorBusinessRow = PublicTableRow<"vendor_businesses">;
-type QuoteRequestRow = PublicTableRow<"quote_requests">;
-type EventRow = PublicTableRow<"events">;
-
-type QuoteWithEvent = QuoteRequestRow & {
-  event?: EventRow;
-};
-
 export function VendorDashboard() {
+  const [activeTab, setActiveTab] = useState<VendorDashboardTab>("Dashboard");
   const [vendors, setVendors] = useState<VendorBusinessRow[]>([]);
+  const [services, setServices] = useState<VendorServiceRow[]>([]);
+  const [availability, setAvailability] = useState<VendorAvailabilityRow[]>([]);
+  const [photos, setPhotos] = useState<VendorPhotoRow[]>([]);
   const [quotes, setQuotes] = useState<QuoteWithEvent[]>([]);
-  const [counterPrices, setCounterPrices] = useState<Record<string, string>>({});
+  const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState("");
 
@@ -42,47 +74,29 @@ export function VendorDashboard() {
         }
 
         const profile = await ensureCurrentProfile(supabase, user, "vendor");
-        const { data: vendorRows, error: vendorError } = await supabase
-          .from("vendor_businesses")
-          .select("*")
-          .eq("owner_id", profile.id)
-          .order("created_at", { ascending: false });
-
-        if (vendorError) {
-          throw vendorError;
-        }
-
-        const vendorIds = (vendorRows ?? []).map((vendor) => vendor.id);
-        setVendors(vendorRows ?? []);
-
-        if (!vendorIds.length) {
-          setQuotes([]);
-          setIsLoading(false);
-          return;
-        }
-
-        const { data: quoteRows, error: quoteError } = await supabase
-          .from("quote_requests")
-          .select("*")
-          .in("vendor_id", vendorIds)
-          .order("created_at", { ascending: false });
-
-        if (quoteError) {
-          throw quoteError;
-        }
-
-        const eventIds = Array.from(
-          new Set((quoteRows ?? []).map((quote) => quote.event_id)),
-        );
-        const { data: eventRows } = eventIds.length
-          ? await supabase.from("events").select("*").in("id", eventIds)
-          : { data: [] };
+        const vendorRows = await getVendorBusinessesByOwner(supabase, profile.id);
+        const vendorIds = vendorRows.map((vendor) => vendor.id);
+        const [serviceRows, availabilityRows, photoRows, quoteRows, bookingRows] =
+          await Promise.all([
+            getVendorServicesByVendorIds(supabase, vendorIds),
+            getVendorAvailabilityByVendorIds(supabase, vendorIds),
+            getVendorPhotosByVendorIds(supabase, vendorIds),
+            getQuoteRequestsForVendors(supabase, vendorIds),
+            getBookingsForVendors(supabase, vendorIds),
+          ]);
+        const eventIds = Array.from(new Set(quoteRows.map((quote) => quote.event_id)));
+        const eventRows = await getEventsByIds(supabase, eventIds);
         const eventsById = new Map(
-          (eventRows ?? []).map((eventRow) => [eventRow.id, eventRow]),
+          eventRows.map((eventRow) => [eventRow.id, eventRow]),
         );
 
+        setVendors(vendorRows);
+        setServices(serviceRows);
+        setAvailability(availabilityRows);
+        setPhotos(photoRows);
+        setBookings(bookingRows);
         setQuotes(
-          (quoteRows ?? []).map((quote) => ({
+          quoteRows.map((quote) => ({
             ...quote,
             event: eventsById.get(quote.event_id),
           })),
@@ -97,49 +111,114 @@ export function VendorDashboard() {
       }
     }
 
-    void loadDashboard();
+    loadDashboard();
   }, []);
 
-  async function updateQuote(
+  async function handleCreateService(draft: ServiceDraft) {
+    const vendor = vendors[0];
+
+    if (!vendor) {
+      setMessage("Create a vendor profile before adding services.");
+      return;
+    }
+
+    try {
+      requireString(draft.serviceName, "Service name");
+      const supabase = createBrowserSupabaseClient();
+      const service = await createVendorService(supabase, {
+        basePrice: draft.pricingType === "hourly" ? null : draft.basePrice,
+        category: draft.category,
+        eventTypesSupported: eventTypes,
+        hourlyRate: draft.pricingType === "hourly" ? draft.hourlyRate : null,
+        minimumHours: draft.pricingType === "hourly" ? draft.minimumHours : null,
+        pricingType: draft.pricingType,
+        serviceName: draft.serviceName,
+        vendorId: vendor.id,
+      });
+
+      setServices((current) => [service, ...current]);
+      setMessage("Service created.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to create service.");
+    }
+  }
+
+  async function handleToggleService(service: VendorServiceRow) {
+    try {
+      const supabase = createBrowserSupabaseClient();
+      const updatedService = await updateVendorService(supabase, {
+        active: !service.active,
+        id: service.id,
+      });
+
+      setServices((current) =>
+        current.map((item) => (item.id === service.id ? updatedService : item)),
+      );
+      setMessage(updatedService.active ? "Service enabled." : "Service disabled.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to update service.");
+    }
+  }
+
+  async function handleCreateAvailability(draft: AvailabilityDraft) {
+    try {
+      requireString(draft.date, "Date");
+      const supabase = createBrowserSupabaseClient();
+      const window = await createAvailabilityWindow(supabase, draft);
+
+      setAvailability((current) => [window, ...current]);
+      setMessage("Availability saved.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to save availability.");
+    }
+  }
+
+  async function handleRespondQuote(
     quoteId: string,
     status: Extract<QuoteStatus, "accepted" | "declined" | "countered">,
+    vendorFinalPrice?: number | null,
   ) {
     try {
       const supabase = createBrowserSupabaseClient();
-      const finalPrice =
-        status === "countered" ? Number(counterPrices[quoteId] ?? 0) : null;
-
-      if (status === "countered" && (!finalPrice || finalPrice <= 0)) {
-        setMessage("Add a counter price before sending a counter.");
-        return;
-      }
-
-      const { error } = await supabase
-        .from("quote_requests")
-        .update({
-          status,
-          vendor_final_price: finalPrice,
-        })
-        .eq("id", quoteId);
-
-      if (error) {
-        throw error;
-      }
+      const updatedQuote = await respondToQuoteRequest(supabase, {
+        quoteId,
+        status,
+        vendorFinalPrice,
+      });
 
       setQuotes((current) =>
         current.map((quote) =>
-          quote.id === quoteId
-            ? {
-                ...quote,
-                status,
-                vendor_final_price: finalPrice,
-              }
-            : quote,
+          quote.id === quoteId ? { ...quote, ...updatedQuote } : quote,
         ),
       );
       setMessage(`Quote ${status}.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to update quote.");
+    }
+  }
+
+  async function handleUpdateBusiness(vendorId: string, draft: BusinessDraft) {
+    try {
+      requireString(draft.businessName, "Business name");
+      requirePositiveNumber(draft.radius, "Radius");
+      const supabase = createBrowserSupabaseClient();
+      const updatedVendor = await updateVendorBusiness(supabase, {
+        businessName: draft.businessName,
+        category: draft.category,
+        city: draft.city,
+        description: draft.description || null,
+        id: vendorId,
+        phone: draft.phone || null,
+        radius: draft.radius,
+        websiteUrl: optionalUrl(draft.websiteUrl),
+      });
+
+      setVendors((current) =>
+        current.map((vendor) => (vendor.id === vendorId ? updatedVendor : vendor)),
+      );
+      setMessage("Business updated.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to update business.");
     }
   }
 
@@ -176,18 +255,18 @@ export function VendorDashboard() {
             Vendor dashboard
           </p>
           <h1 className="mt-4 text-4xl font-semibold tracking-tight sm:text-6xl">
-            Quote requests.
+            Run your event business.
           </h1>
           <p className="mt-4 max-w-2xl text-lg text-neutral-600">
-            Accept, decline, or counter planner quote requests. Bookings and
-            payments are intentionally not part of this milestone.
+            Manage services, availability, quotes, bookings, and your public
+            business profile from one operational console.
           </p>
         </div>
         <Link
           href="/vendor/onboarding"
           className="rounded-full bg-[#ff5a5f] px-5 py-3 text-sm font-semibold text-white"
         >
-          Add services
+          Add business
         </Link>
       </div>
 
@@ -197,114 +276,64 @@ export function VendorDashboard() {
         </p>
       ) : null}
 
-      <div className="mt-10 grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
-        <section className="rounded-lg border border-neutral-200 bg-white p-6 shadow-[0_18px_44px_rgba(20,20,20,0.05)]">
-          <h2 className="text-2xl font-semibold tracking-tight">Your vendor profiles</h2>
-          <div className="mt-5 space-y-3">
-            {vendors.length ? (
-              vendors.map((vendor) => (
-                <article key={vendor.id} className="rounded-lg border border-neutral-200 p-4">
-                  <p className="font-semibold text-neutral-950">
-                    {vendor.business_name}
-                  </p>
-                  <p className="mt-1 text-sm text-neutral-500">
-                    {vendor.category} - {vendor.approval_status}
-                  </p>
-                </article>
-              ))
-            ) : (
-              <p className="rounded-lg border border-dashed border-neutral-300 p-5 text-sm text-neutral-600">
-                Create a vendor profile to receive quote requests.
-              </p>
-            )}
-          </div>
-        </section>
+      <div className="mt-8 overflow-x-auto rounded-lg border border-neutral-200 bg-white p-2">
+        <div className="flex min-w-max gap-2">
+          {vendorDashboardTabs.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`h-10 rounded-full px-4 text-sm font-semibold transition ${
+                activeTab === tab
+                  ? "bg-neutral-950 text-white"
+                  : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-950"
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+      </div>
 
-        <section className="rounded-lg border border-neutral-200 bg-white p-6 shadow-[0_18px_44px_rgba(20,20,20,0.05)]">
-          <h2 className="text-2xl font-semibold tracking-tight">Incoming requests</h2>
-          <div className="mt-5 space-y-4">
-            {quotes.length ? (
-              quotes.map((quote) => (
-                <article key={quote.id} className="rounded-lg border border-neutral-200 p-4">
-                  <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
-                    <div>
-                      <p className="font-semibold text-neutral-950">
-                        {quote.event?.title ?? "Planner event"}
-                      </p>
-                      <p className="mt-1 text-sm text-neutral-500">
-                        {quote.event?.event_type ?? "Event"} -{" "}
-                        {quote.event?.date ?? "No date"} -{" "}
-                        {quote.guest_count ?? quote.event?.guest_count ?? 0} guests
-                      </p>
-                      <p className="mt-2 text-sm text-neutral-600">
-                        Requested: {quote.requested_start_time ?? "--"} to{" "}
-                        {quote.requested_end_time ?? "--"}
-                      </p>
-                    </div>
-                    <span className="w-fit rounded-full bg-neutral-100 px-3 py-1 text-xs font-semibold text-neutral-700">
-                      {quote.status}
-                    </span>
-                  </div>
-                  <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-end">
-                    <div className="min-w-32">
-                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-neutral-500">
-                        Estimate
-                      </p>
-                      <p className="mt-1 text-2xl font-semibold">
-                        $
-                        {Number(
-                          quote.vendor_final_price ?? quote.estimated_price ?? 0,
-                        ).toLocaleString()}
-                      </p>
-                    </div>
-                    <label className="grid flex-1 gap-2 text-sm font-semibold text-neutral-700">
-                      Counter price
-                      <input
-                        value={counterPrices[quote.id] ?? ""}
-                        onChange={(event) =>
-                          setCounterPrices((current) => ({
-                            ...current,
-                            [quote.id]: event.target.value,
-                          }))
-                        }
-                        type="number"
-                        min="1"
-                        className="h-11 rounded-lg border border-neutral-300 px-3 text-sm outline-none focus:border-neutral-950"
-                      />
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => updateQuote(quote.id, "accepted")}
-                        className="h-10 rounded-full bg-neutral-950 px-4 text-sm font-semibold text-white"
-                      >
-                        Accept
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => updateQuote(quote.id, "countered")}
-                        className="h-10 rounded-full bg-[#ff5a5f] px-4 text-sm font-semibold text-white"
-                      >
-                        Counter
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => updateQuote(quote.id, "declined")}
-                        className="h-10 rounded-full border border-neutral-300 px-4 text-sm font-semibold text-neutral-950"
-                      >
-                        Decline
-                      </button>
-                    </div>
-                  </div>
-                </article>
-              ))
-            ) : (
-              <p className="rounded-lg border border-dashed border-neutral-300 p-5 text-sm text-neutral-600">
-                No incoming quote requests yet.
-              </p>
-            )}
-          </div>
-        </section>
+      <div className="mt-6">
+        {activeTab === "Dashboard" ? (
+          <DashboardTab
+            bookings={bookings}
+            quotes={quotes}
+            services={services}
+            vendors={vendors}
+          />
+        ) : null}
+        {activeTab === "Services" ? (
+          <ServicesTab
+            onCreateService={handleCreateService}
+            onToggleService={handleToggleService}
+            services={services}
+            vendors={vendors}
+          />
+        ) : null}
+        {activeTab === "Availability" ? (
+          <AvailabilityTab
+            availability={availability}
+            onCreateAvailability={handleCreateAvailability}
+            vendors={vendors}
+          />
+        ) : null}
+        {activeTab === "Photos" ? <PhotosTab photos={photos} /> : null}
+        {activeTab === "Quotes" ? (
+          <QuotesTab onRespondQuote={handleRespondQuote} quotes={quotes} />
+        ) : null}
+        {activeTab === "Bookings" ? <BookingsTab bookings={bookings} /> : null}
+        {activeTab === "Profile" ? <ProfileTab vendors={vendors} /> : null}
+        {activeTab === "Business Settings" ? (
+          <BusinessSettingsTab
+            onUpdateBusiness={handleUpdateBusiness}
+            vendors={vendors}
+          />
+        ) : null}
+        {activeTab === "Analytics" ? (
+          <AnalyticsTab bookings={bookings} quotes={quotes} services={services} />
+        ) : null}
       </div>
     </div>
   );

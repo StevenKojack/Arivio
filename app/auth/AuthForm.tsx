@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { createBrowserSupabaseClient, hasSupabaseConfig } from "@/lib/supabase/client";
+import { upsertProfile } from "@/lib/repositories/profilesRepository";
 import type { UserRole } from "@/lib/types/domain";
 
 type AuthFormProps = {
@@ -62,21 +63,14 @@ export function AuthForm({ mode }: AuthFormProps) {
         }
 
         if (data.user) {
-          const { error: profileError } = await supabase.from("profiles").upsert({
+          await upsertProfile(supabase, {
             email,
-            full_name: fullName || null,
+            fullName: fullName || null,
             phone: phone || null,
             role,
-            user_id: data.user.id,
+            userId: data.user.id,
           });
-
-          if (profileError) {
-            setStatus(
-              "Account created. Confirm your email if required, then your profile will finish syncing after login.",
-            );
-          } else {
-            setStatus("Account created. You can continue to your dashboard.");
-          }
+          setStatus("Account created. You can continue to your dashboard.");
         }
 
         router.refresh();

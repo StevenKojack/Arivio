@@ -4,8 +4,13 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { allServices, eventTypes } from "../../data/marketplace";
 import { createBrowserSupabaseClient, hasSupabaseConfig } from "@/lib/supabase/client";
-import { ensureCurrentProfile } from "@/lib/supabase/profiles";
+import { ensureCurrentProfile } from "@/lib/repositories/profilesRepository";
+import {
+  createVendorBusiness,
+  createVendorService,
+} from "@/lib/repositories/vendorsRepository";
 import type { PricingType } from "@/lib/types/domain";
+import { optionalUrl, requirePositiveNumber, requireString } from "@/lib/validators/forms";
 
 export function VendorOnboardingForm() {
   const router = useRouter();
@@ -59,41 +64,32 @@ export function VendorOnboardingForm() {
       }
 
       const profile = await ensureCurrentProfile(supabase, user, "vendor");
-      const { data: vendor, error: vendorError } = await supabase
-        .from("vendor_businesses")
-        .insert({
-          business_name: businessName,
-          category,
-          description: description || null,
-          approval_status: "approved",
-          owner_id: profile.id,
-          phone: phone || null,
-          service_area_city: city,
-          service_radius_miles: radius,
-          website_url: websiteUrl || null,
-        })
-        .select("id")
-        .single();
-
-      if (vendorError) {
-        throw vendorError;
-      }
-
-      const { error: serviceError } = await supabase.from("vendor_services").insert({
-        base_price: pricingType === "hourly" ? null : basePrice,
+      requireString(businessName, "Business name");
+      requireString(serviceName, "Service name");
+      requirePositiveNumber(radius, "Service radius");
+      const vendor = await createVendorBusiness(supabase, {
+        approvalStatus: "approved",
+        businessName,
         category,
+        city,
         description: description || null,
-        event_types_supported: selectedEventTypes,
-        hourly_rate: pricingType === "hourly" ? hourlyRate : null,
-        minimum_hours: pricingType === "hourly" ? minimumHours : null,
-        pricing_type: pricingType,
-        service_name: serviceName,
-        vendor_id: vendor.id,
+        ownerId: profile.id,
+        phone: phone || null,
+        radius,
+        websiteUrl: optionalUrl(websiteUrl),
       });
 
-      if (serviceError) {
-        throw serviceError;
-      }
+      await createVendorService(supabase, {
+        basePrice: pricingType === "hourly" ? null : basePrice,
+        category,
+        description: description || null,
+        eventTypesSupported: selectedEventTypes,
+        hourlyRate: pricingType === "hourly" ? hourlyRate : null,
+        minimumHours: pricingType === "hourly" ? minimumHours : null,
+        pricingType,
+        serviceName,
+        vendorId: vendor.id,
+      });
 
       router.push("/account");
       router.refresh();

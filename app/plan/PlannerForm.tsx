@@ -12,7 +12,9 @@ import {
   type ServiceName,
 } from "../data/marketplace";
 import { createBrowserSupabaseClient, hasSupabaseConfig } from "@/lib/supabase/client";
-import { ensureCurrentProfile } from "@/lib/supabase/profiles";
+import { createEvent } from "@/lib/repositories/eventsRepository";
+import { ensureCurrentProfile } from "@/lib/repositories/profilesRepository";
+import { requirePositiveNumber, requireString } from "@/lib/validators/forms";
 
 export function PlannerForm() {
   const router = useRouter();
@@ -151,29 +153,24 @@ export function PlannerForm() {
       }
 
       const profile = await ensureCurrentProfile(supabase, user, "planner");
-      const { data, error: insertError } = await supabase
-        .from("events")
-        .insert({
-          address: address || null,
-          budget_max: budget,
-          budget_min: Math.max(Math.round(budget * 0.75), 0),
-          city: city || null,
-          date: eventDate || null,
-          end_time: endTime,
-          event_type: eventType,
-          guest_count: guestCount,
-          planner_id: profile.id,
-          start_time: startTime,
-          status: "planning",
-          title: title || `${eventType} event`,
-          venue_needed: needsVenue,
-        })
-        .select("id")
-        .single();
-
-      if (insertError) {
-        throw insertError;
-      }
+      requireString(title || `${eventType} event`, "Event title");
+      requirePositiveNumber(guestCount, "Guest count");
+      requirePositiveNumber(budget, "Budget");
+      const data = await createEvent(supabase, {
+        address: address || null,
+        budgetMax: budget,
+        budgetMin: Math.max(Math.round(budget * 0.75), 0),
+        city: city || null,
+        date: eventDate || null,
+        endTime,
+        eventType,
+        guestCount,
+        plannerId: profile.id,
+        startTime,
+        status: "planning",
+        title: title || `${eventType} event`,
+        venueNeeded: needsVenue,
+      });
 
       setStatus("Event saved. Opening your event dashboard...");
       router.push(`/events/${data.id}`);

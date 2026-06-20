@@ -21,7 +21,14 @@ export function MarketplaceCard({
 }: MarketplaceCardProps) {
   return (
     <article className="group flex h-full flex-col overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-[0_18px_44px_rgba(20,20,20,0.06)] transition duration-300 hover:-translate-y-1 hover:border-neutral-300 hover:shadow-[0_24px_58px_rgba(20,20,20,0.1)]">
-      <div className="h-2 bg-[#ff5a5f]" />
+      {item.photoUrl ? (
+        <div
+          className="h-40 bg-cover bg-center"
+          style={{ backgroundImage: `url(${item.photoUrl})` }}
+        />
+      ) : (
+        <div className="h-2 bg-[#ff5a5f]" />
+      )}
       <div className="flex flex-1 flex-col p-5">
         <div className="flex items-start justify-between gap-4">
           <div>

@@ -26,12 +26,15 @@ import {
 import { createBrowserSupabaseClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import type { PublicTableRow } from "@/lib/supabase/database.types";
 import {
-  createCartItem,
-  createQuoteRequestsFromCart,
   getEventById,
   getMarketplaceProviders,
-} from "@/lib/supabase/marketplace";
-import { ensureCurrentProfile } from "@/lib/supabase/profiles";
+} from "@/lib/repositories/marketplaceRepository";
+import {
+  createCartItem,
+  updateCartItemTime,
+} from "@/lib/repositories/cartRepository";
+import { ensureCurrentProfile } from "@/lib/repositories/profilesRepository";
+import { requestQuotesFromCart } from "@/lib/services/quoteService";
 
 type MarketplaceFilter = (typeof marketplaceTypes)[number];
 type EventRow = PublicTableRow<"events">;
@@ -188,6 +191,12 @@ export function MarketplaceBrowser() {
       miles <= item.serviceRadiusMiles;
     const isNearEnough =
       !eventCoordinates || item.type === "Venue" || driveMinutes <= 60;
+    const matchesAvailability = isAvailableAt(
+      item,
+      eventDate,
+      startTime,
+      endTime,
+    );
 
     return (
       matchesType &&
@@ -196,7 +205,8 @@ export function MarketplaceBrowser() {
       matchesQuery &&
       matchesCity &&
       withinRadius &&
-      isNearEnough
+      isNearEnough &&
+      matchesAvailability
     );
   });
   const cartTotal = cart.reduce((total, line) => total + getLineQuote(line), 0);
@@ -432,19 +442,13 @@ export function MarketplaceBrowser() {
 
     try {
       const supabase = createBrowserSupabaseClient();
-      const { error } = await supabase
-        .from("cart_items")
-        .update({
-          end_time: nextLine.serviceEnd,
-          estimated_price: quoteItem(nextLine.item, getLineContext(nextLine)),
-          start_time: nextLine.serviceStart,
-        })
-        .eq("id", nextLine.cartItemId)
-        .eq("event_id", savedEvent.id);
-
-      if (error) {
-        throw error;
-      }
+      await updateCartItemTime(supabase, {
+        cartItemId: nextLine.cartItemId,
+        endTime: nextLine.serviceEnd,
+        estimatedPrice: quoteItem(nextLine.item, getLineContext(nextLine)),
+        eventId: savedEvent.id,
+        startTime: nextLine.serviceStart,
+      });
     } catch (error) {
       setCartMessage(
         error instanceof Error ? error.message : "Unable to sync cart item time.",
@@ -478,7 +482,7 @@ export function MarketplaceBrowser() {
 
     try {
       const supabase = createBrowserSupabaseClient();
-      const requests = await createQuoteRequestsFromCart(supabase, {
+      const requests = await requestQuotesFromCart(supabase, {
         cartItems: persistedDatabaseLines.map((line) => ({
           end_time: line.serviceEnd,
           estimated_price: getLineQuote(line),

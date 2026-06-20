@@ -17,7 +17,8 @@ export type QuoteStatus =
   | "accepted"
   | "declined"
   | "countered"
-  | "expired";
+  | "expired"
+  | "cancelled";
 
 export type BookingStatus =
   | "pending"

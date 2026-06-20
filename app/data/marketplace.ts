@@ -70,6 +70,7 @@ export type MarketplaceItem = {
   name: string;
   type: ServiceName;
   location: string;
+  photoUrl?: string | null;
   address: string;
   coordinates: Coordinates;
   price: string;
@@ -80,6 +81,7 @@ export type MarketplaceItem = {
   description: string;
   pricing: PricingModel;
   availability: AvailabilityWindow[];
+  blockedDates?: string[];
   sourceLabel: string;
   sourceUrl: string;
   serviceRadiusMiles?: number;
@@ -333,6 +335,10 @@ export function isAvailableAt(
 ) {
   if (!date || !startTime) {
     return true;
+  }
+
+  if (item.blockedDates?.includes(date)) {
+    return false;
   }
 
   const day = new Intl.DateTimeFormat("en-US", { weekday: "short" }).format(
