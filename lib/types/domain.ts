@@ -42,3 +42,5 @@ export type AvailabilityStatus = "available" | "blocked" | "tentative";
 export type ItemType = "vendor_service" | "venue";
 
 export type RsvpStatus = "pending" | "yes" | "no" | "maybe";
+
+export type AdminDecision = "approved" | "rejected";
