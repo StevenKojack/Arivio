@@ -5,6 +5,7 @@ const navItems = [
   { label: "Marketplace", href: "/marketplace" },
   { label: "Plan", href: "/plan" },
   { label: "Account", href: "/account" },
+  { label: "Setup", href: "/setup" },
 ];
 
 export function Navigation() {

@@ -1,36 +1,79 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Arivio
 
-## Getting Started
+Arivio is building the Airbnb for events: planners create an event, compare nearby venues and providers, build a quote cart, request quotes, and eventually book.
 
-First, run the development server:
+## Run Locally
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+Use the Windows launcher:
+
+```cmd
+start-dev.cmd
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Or run:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```cmd
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Open:
 
-## Learn More
+```text
+http://127.0.0.1:3000
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Supabase Setup
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The app is wired for Supabase, but you still need to create the Supabase project and add keys locally.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Create a Supabase project at `https://supabase.com`.
+2. Open Project Settings -> API.
+3. Copy:
+   - Project URL
+   - anon public key
+4. Create `.env.local` in this folder:
 
-## Deploy on Vercel
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+5. In Supabase, open SQL Editor.
+6. Paste and run:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```text
+supabase/schema.sql
+```
+
+7. Restart the dev server.
+
+Once configured, these flows can persist data:
+
+- `/auth/signup`
+- `/auth/login`
+- `/plan`
+- `/account`
+- `/events/[id]`
+- `/vendor/onboarding`
+
+## Current Backend Scope
+
+Implemented:
+
+- Supabase client helpers
+- Database schema
+- Auth pages
+- Profile creation
+- Saved events
+- Account dashboard
+- Event detail page
+- Vendor onboarding starter flow
+
+Not implemented yet:
+
+- Stripe payments
+- Google Maps API
+- Real geocoding
+- Real drive-time API
+- File uploads
+- Production admin dashboard

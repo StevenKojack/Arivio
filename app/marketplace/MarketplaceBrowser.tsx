@@ -6,7 +6,9 @@ import { MarketplaceCard } from "../components/MarketplaceCard";
 import {
   entertainmentServices,
   estimateDriveMinutes,
+  eventPlanPresets,
   eventTypes,
+  getDistanceMiles,
   getEndTime,
   getHoursBetween,
   homeAreas,
@@ -45,16 +47,20 @@ export function MarketplaceBrowser() {
     .get("services")
     ?.split(",")
     .filter(isServiceName);
+  const initialEventType = isEventType(initialEvent) ? initialEvent : "All";
   const initialGuests = Number(searchParams.get("guests") ?? 40);
   const initialBudget = searchParams.get("budget");
+  const initialRecommendedServices =
+    initialEventType === "All" ? [] : eventPlanPresets[initialEventType].recommended;
   const [selectedType, setSelectedType] = useState<MarketplaceFilter>("All");
   const [selectedEvent, setSelectedEvent] = useState<EventType | "All">(
-    isEventType(initialEvent) ? initialEvent : "All",
+    initialEventType,
   );
   const [selectedServices, setSelectedServices] = useState<ServiceName[]>(
-    initialServices ?? [],
+    initialServices ?? initialRecommendedServices,
   );
   const [query, setQuery] = useState("");
+  const [showAllServiceFilters, setShowAllServiceFilters] = useState(false);
   const [eventDate, setEventDate] = useState(searchParams.get("date") ?? "");
   const [startTime, setStartTime] = useState(searchParams.get("time") ?? "14:00");
   const [endTime, setEndTime] = useState(
@@ -66,6 +72,8 @@ export function MarketplaceBrowser() {
   const [useHomeVenue, setUseHomeVenue] = useState(false);
   const [homeAddress, setHomeAddress] = useState("");
   const [homeAreaName, setHomeAreaName] = useState(homeAreas[0].name);
+  const [liveCoordinates, setLiveCoordinates] = useState<Coordinates | null>(null);
+  const [locationStatus, setLocationStatus] = useState("");
   const [selectedVenueId, setSelectedVenueId] = useState<number | null>(() => {
     if (!isEventType(initialEvent)) {
       return null;
@@ -88,9 +96,31 @@ export function MarketplaceBrowser() {
     ? venueItems.find((venue) => venue.id === selectedVenueId)
     : undefined;
   const homeArea = homeAreas.find((area) => area.name === homeAreaName) ?? homeAreas[0];
+  const homeCoordinates = liveCoordinates ?? homeArea.coordinates;
   const eventCoordinates: Coordinates | undefined = useHomeVenue
-    ? homeArea.coordinates
+    ? homeCoordinates
     : selectedVenue?.coordinates;
+  const providerEstimates = eventCoordinates
+    ? marketplaceItems
+        .filter((item) => item.type !== "Venue")
+        .map((item) => ({
+          driveMinutes: estimateDriveMinutes(eventCoordinates, item.coordinates),
+          item,
+          miles: getDistanceMiles(eventCoordinates, item.coordinates),
+        }))
+        .filter((estimate) => estimate.driveMinutes <= 60)
+        .sort((a, b) => a.driveMinutes - b.driveMinutes)
+    : [];
+  const visibleMarketplaceTypes =
+    showAllServiceFilters || selectedEvent === "All"
+      ? marketplaceTypes
+      : ([
+          "All",
+          ...eventPlanPresets[selectedEvent].recommended,
+          ...selectedServices,
+        ].filter(
+          (service, index, services) => services.indexOf(service) === index,
+        ) as MarketplaceFilter[]);
   const planSummary = [
     isEventType(initialEvent) ? initialEvent : null,
     guestCount ? `${guestCount.toLocaleString()} guests` : null,
@@ -156,6 +186,57 @@ export function MarketplaceBrowser() {
     );
   }
 
+  function chooseEventType(nextEvent: EventType | "All") {
+    setSelectedEvent(nextEvent);
+    setSelectedType("All");
+    setQuery("");
+    setShowAllServiceFilters(false);
+    setSelectedServices(
+      nextEvent === "All" ? [] : eventPlanPresets[nextEvent].recommended,
+    );
+    setSelectedVenueId(
+      nextEvent === "All"
+        ? null
+        : venueItems.find((venue) => venue.events.includes(nextEvent))?.id ?? null,
+    );
+  }
+
+  function useCurrentLocation() {
+    setLocationStatus("");
+
+    if (!navigator.geolocation) {
+      setLocationStatus("Your browser does not support live location.");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const nextCoordinates = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+        const nearestArea = homeAreas
+          .map((area) => ({
+            area,
+            distance: getDistanceMiles(nextCoordinates, area.coordinates),
+          }))
+          .sort((a, b) => a.distance - b.distance)[0]?.area;
+
+        setLiveCoordinates(nextCoordinates);
+        setUseHomeVenue(true);
+        setHomeAddress("Current live location");
+        if (nearestArea) {
+          setHomeAreaName(nearestArea.name);
+        }
+        setLocationStatus("Live location applied. Provider estimates updated.");
+      },
+      () => {
+        setLocationStatus("Location permission was blocked or unavailable.");
+      },
+      { enableHighAccuracy: true, maximumAge: 60000, timeout: 10000 },
+    );
+  }
+
   function addToCart(item: MarketplaceItem) {
     setCart((current) => {
       if (current.some((line) => line.item.id === item.id)) {
@@ -206,7 +287,7 @@ export function MarketplaceBrowser() {
             <select
               value={selectedEvent}
               onChange={(event) =>
-                setSelectedEvent(event.target.value as EventType | "All")
+                chooseEventType(event.target.value as EventType | "All")
               }
               className="h-12 rounded-lg border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-800 outline-none transition focus:border-neutral-950"
             >
@@ -257,7 +338,7 @@ export function MarketplaceBrowser() {
             </label>
           </div>
 
-          <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_1fr]">
+          <div className="mt-5 grid gap-4 xl:grid-cols-[360px_1fr]">
             <div className="rounded-lg border border-neutral-200 bg-[#fbfbfa] p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -287,7 +368,7 @@ export function MarketplaceBrowser() {
                   <input
                     value={homeAddress}
                     onChange={(event) => setHomeAddress(event.target.value)}
-                    placeholder="Home address"
+                    placeholder="Home address or use current location"
                     className="h-11 rounded-lg border border-neutral-300 px-3 text-sm font-semibold text-neutral-900 outline-none focus:border-neutral-950"
                   />
                   <select
@@ -299,6 +380,18 @@ export function MarketplaceBrowser() {
                       <option key={area.name}>{area.name}</option>
                     ))}
                   </select>
+                  <button
+                    type="button"
+                    onClick={useCurrentLocation}
+                    className="h-11 rounded-full bg-neutral-950 px-4 text-sm font-semibold text-white transition hover:bg-neutral-800"
+                  >
+                    Autofill live location
+                  </button>
+                  {locationStatus ? (
+                    <p className="text-xs font-semibold text-neutral-600">
+                      {locationStatus}
+                    </p>
+                  ) : null}
                 </div>
               ) : (
                 <select
@@ -323,11 +416,19 @@ export function MarketplaceBrowser() {
             <VenueMap
               selectedVenueId={selectedVenueId}
               useHomeVenue={useHomeVenue}
-              homeCoordinates={homeArea.coordinates}
+              homeCoordinates={homeCoordinates}
               venues={venueItems}
               onSelectVenue={setSelectedVenueId}
             />
           </div>
+
+          <LocationEstimatePanel
+            eventCoordinates={eventCoordinates}
+            homeAddress={homeAddress}
+            isHomeVenue={useHomeVenue}
+            providerEstimates={providerEstimates}
+            selectedVenueName={selectedVenue?.name}
+          />
 
           <div className="mt-5 rounded-lg border border-[#ffd6d7] bg-[#fff8f8] p-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -360,7 +461,7 @@ export function MarketplaceBrowser() {
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
-            {marketplaceTypes.map((type) => (
+            {visibleMarketplaceTypes.map((type) => (
               <button
                 key={type}
                 type="button"
@@ -374,6 +475,15 @@ export function MarketplaceBrowser() {
                 {type}
               </button>
             ))}
+            {selectedEvent !== "All" ? (
+              <button
+                type="button"
+                onClick={() => setShowAllServiceFilters((current) => !current)}
+                className="h-10 rounded-full border border-[#ffc5c7] bg-[#fff8f8] px-4 text-sm font-semibold text-[#b73532] transition hover:border-[#ff5a5f]"
+              >
+                {showAllServiceFilters ? "Show recommended" : "More services"}
+              </button>
+            ) : null}
           </div>
 
           {selectedServices.length ? (
@@ -569,6 +679,84 @@ type VenueMapProps = {
   venues: MarketplaceItem[];
 };
 
+type ProviderEstimate = {
+  driveMinutes: number;
+  item: MarketplaceItem;
+  miles: number;
+};
+
+function LocationEstimatePanel({
+  eventCoordinates,
+  homeAddress,
+  isHomeVenue,
+  providerEstimates,
+  selectedVenueName,
+}: {
+  eventCoordinates?: Coordinates;
+  homeAddress: string;
+  isHomeVenue: boolean;
+  providerEstimates: ProviderEstimate[];
+  selectedVenueName?: string;
+}) {
+  const closestProvider = providerEstimates[0];
+  const longestDrive = providerEstimates[providerEstimates.length - 1];
+
+  return (
+    <section className="mt-4 grid gap-3 rounded-lg border border-neutral-200 bg-neutral-950 p-4 text-white md:grid-cols-4">
+      <div className="md:col-span-2">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#ff8b8f]">
+          Live location estimate
+        </p>
+        <p className="mt-2 text-sm text-neutral-300">
+          {eventCoordinates
+            ? isHomeVenue
+              ? homeAddress || "Home venue location selected"
+              : selectedVenueName ?? "Venue selected"
+            : "Select a venue or use live location to start estimating."}
+        </p>
+      </div>
+      <EstimateMetric
+        label="Providers within 1 hour"
+        value={eventCoordinates ? String(providerEstimates.length) : "0"}
+      />
+      <EstimateMetric
+        label="Closest provider"
+        value={closestProvider ? `${closestProvider.driveMinutes} min` : "--"}
+        detail={closestProvider?.item.name}
+      />
+      <div className="rounded-lg border border-white/10 p-3 md:col-span-4">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <p className="text-sm text-neutral-300">
+            Normal traffic estimate uses local coordinates until Google Routes
+            API is connected.
+          </p>
+          <p className="text-sm font-semibold text-white">
+            Farthest shown: {longestDrive ? `${longestDrive.driveMinutes} min` : "--"}
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function EstimateMetric({
+  detail,
+  label,
+  value,
+}: {
+  detail?: string;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-lg border border-white/10 p-3">
+      <p className="text-xs text-neutral-400">{label}</p>
+      <p className="mt-1 text-2xl font-semibold">{value}</p>
+      {detail ? <p className="mt-1 text-xs text-neutral-400">{detail}</p> : null}
+    </div>
+  );
+}
+
 function VenueMap({
   homeCoordinates,
   onSelectVenue,
@@ -594,7 +782,7 @@ function VenueMap({
   }
 
   return (
-    <div className="relative min-h-64 overflow-hidden rounded-lg border border-neutral-200 bg-[#eef3ef] p-4">
+    <div className="relative min-h-[420px] overflow-hidden rounded-lg border border-neutral-200 bg-[#eef3ef] p-4 shadow-inner">
       <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.42)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.42)_1px,transparent_1px)] bg-[size:36px_36px]" />
       <div className="absolute left-4 top-4 z-10 rounded-full bg-white px-3 py-1 text-xs font-semibold text-neutral-700 shadow">
         Venue map
