@@ -1,5 +1,7 @@
+"use client";
+
 import Link from "next/link";
-import { marketplaceItems } from "../data/marketplace";
+import { marketplaceItems, quoteItem } from "../data/marketplace";
 import { MarketplaceCard } from "./MarketplaceCard";
 
 export function MarketplacePreview() {
@@ -24,7 +26,18 @@ export function MarketplacePreview() {
         </div>
         <div className="mt-10 grid gap-5 md:grid-cols-3">
           {marketplaceItems.slice(0, 3).map((item) => (
-            <MarketplaceCard key={item.id} item={item} />
+            <MarketplaceCard
+              key={item.id}
+              available
+              buttonLabel="Preview quote"
+              item={item}
+              quote={quoteItem(item, {
+                durationHours: 3,
+                guests: 40,
+                startTime: "14:00",
+              })}
+              onAdd={() => undefined}
+            />
           ))}
         </div>
       </div>

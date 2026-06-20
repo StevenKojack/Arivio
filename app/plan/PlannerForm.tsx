@@ -14,6 +14,9 @@ export function PlannerForm() {
   const [eventType, setEventType] = useState<EventType>("Birthday");
   const [guestCount, setGuestCount] = useState(40);
   const [budget, setBudget] = useState(5000);
+  const [eventDate, setEventDate] = useState("");
+  const [startTime, setStartTime] = useState("14:00");
+  const [durationHours, setDurationHours] = useState(3);
   const [needsVenue, setNeedsVenue] = useState(true);
   const [showMore, setShowMore] = useState(false);
   const [services, setServices] = useState<ServiceName[]>(
@@ -53,6 +56,9 @@ export function PlannerForm() {
       venue: needsVenue ? "yes" : "no",
       guests: String(guestCount),
       budget: String(budget),
+      date: eventDate,
+      duration: String(durationHours),
+      time: startTime,
     });
 
     if (activeServices.length > 0) {
@@ -60,7 +66,16 @@ export function PlannerForm() {
     }
 
     return `/marketplace?${params.toString()}`;
-  }, [activeServices, budget, eventType, guestCount, needsVenue]);
+  }, [
+    activeServices,
+    budget,
+    durationHours,
+    eventDate,
+    eventType,
+    guestCount,
+    needsVenue,
+    startTime,
+  ]);
 
   function chooseEventType(nextEventType: EventType) {
     const nextRecommended = eventPlanPresets[nextEventType].recommended;
@@ -113,6 +128,8 @@ export function PlannerForm() {
             Event date
             <input
               type="date"
+              value={eventDate}
+              onChange={(event) => setEventDate(event.target.value)}
               className="h-12 rounded-lg border border-neutral-300 px-4 text-sm font-medium outline-none transition focus:border-neutral-950"
             />
           </label>
@@ -130,6 +147,29 @@ export function PlannerForm() {
               min="1"
               value={guestCount}
               onChange={(event) => setGuestCount(Number(event.target.value))}
+              className="h-12 rounded-lg border border-neutral-300 px-4 text-sm font-medium outline-none transition focus:border-neutral-950"
+            />
+          </label>
+        </div>
+
+        <div className="mt-5 grid gap-5 sm:grid-cols-2">
+          <label className="flex flex-col gap-2 text-sm font-semibold text-neutral-800">
+            Start time
+            <input
+              type="time"
+              value={startTime}
+              onChange={(event) => setStartTime(event.target.value)}
+              className="h-12 rounded-lg border border-neutral-300 px-4 text-sm font-medium outline-none transition focus:border-neutral-950"
+            />
+          </label>
+          <label className="flex flex-col gap-2 text-sm font-semibold text-neutral-800">
+            Service hours
+            <input
+              type="number"
+              min="1"
+              max="12"
+              value={durationHours}
+              onChange={(event) => setDurationHours(Number(event.target.value))}
               className="h-12 rounded-lg border border-neutral-300 px-4 text-sm font-medium outline-none transition focus:border-neutral-950"
             />
           </label>
@@ -247,6 +287,12 @@ export function PlannerForm() {
           {eventType} for {guestCount.toLocaleString()} guests
         </h2>
         <div className="mt-8 space-y-4">
+          <div className="rounded-lg border border-white/10 p-4">
+            <p className="text-sm text-neutral-400">Booking window</p>
+            <p className="mt-1 text-base font-semibold">
+              {eventDate || "Choose date"} at {startTime} for {durationHours}h
+            </p>
+          </div>
           <div className="rounded-lg border border-white/10 p-4">
             <p className="text-sm text-neutral-400">Venue search</p>
             <p className="mt-1 text-xl font-semibold">
