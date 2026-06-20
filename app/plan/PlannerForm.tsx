@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import {
   allServices,
@@ -10,9 +11,15 @@ import {
   type EventType,
   type ServiceName,
 } from "../data/marketplace";
+import { createBrowserSupabaseClient, hasSupabaseConfig } from "@/lib/supabase/client";
+import { ensureCurrentProfile } from "@/lib/supabase/profiles";
 
 export function PlannerForm() {
+  const router = useRouter();
   const [eventType, setEventType] = useState<EventType>("Birthday");
+  const [title, setTitle] = useState("Birthday celebration");
+  const [city, setCity] = useState("Los Angeles");
+  const [address, setAddress] = useState("");
   const [guestCount, setGuestCount] = useState(40);
   const [budget, setBudget] = useState(5000);
   const [eventDate, setEventDate] = useState("");
@@ -20,6 +27,9 @@ export function PlannerForm() {
   const [endTime, setEndTime] = useState("17:00");
   const [needsVenue, setNeedsVenue] = useState(true);
   const [showMore, setShowMore] = useState(false);
+  const [status, setStatus] = useState("");
+  const [error, setError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
   const [services, setServices] = useState<ServiceName[]>(
     eventPlanPresets.Birthday.recommended,
   );
@@ -60,6 +70,7 @@ export function PlannerForm() {
       date: eventDate,
       duration: String(getHoursBetween(startTime, endTime)),
       time: startTime,
+      city,
     });
 
     if (activeServices.length > 0) {
@@ -70,6 +81,7 @@ export function PlannerForm() {
   }, [
     activeServices,
     budget,
+    city,
     endTime,
     eventDate,
     eventType,
@@ -109,10 +121,86 @@ export function PlannerForm() {
     );
   }
 
+  async function saveEvent() {
+    setError("");
+    setStatus("");
+
+    if (!hasSupabaseConfig()) {
+      setError(
+        "Supabase is not configured yet. Add .env.local values to save real events. You can still use View matched options.",
+      );
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      const supabase = createBrowserSupabaseClient();
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+
+      if (sessionError) {
+        throw sessionError;
+      }
+
+      const user = sessionData.session?.user;
+
+      if (!user) {
+        router.push("/auth/login");
+        return;
+      }
+
+      const profile = await ensureCurrentProfile(supabase, user, "planner");
+      const { data, error: insertError } = await supabase
+        .from("events")
+        .insert({
+          address: address || null,
+          budget_max: budget,
+          budget_min: Math.max(Math.round(budget * 0.75), 0),
+          city: city || null,
+          date: eventDate || null,
+          end_time: endTime,
+          event_type: eventType,
+          guest_count: guestCount,
+          planner_id: profile.id,
+          start_time: startTime,
+          status: "planning",
+          title: title || `${eventType} event`,
+          venue_needed: needsVenue,
+        })
+        .select("id")
+        .single();
+
+      if (insertError) {
+        throw insertError;
+      }
+
+      setStatus("Event saved. Opening your event dashboard...");
+      router.push(`/events/${data.id}`);
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to save this event.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   return (
     <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
       <form className="rounded-lg border border-neutral-200 bg-white p-6 shadow-[0_22px_60px_rgba(20,20,20,0.07)]">
         <div className="grid gap-5 sm:grid-cols-2">
+          <label className="flex flex-col gap-2 text-sm font-semibold text-neutral-800 sm:col-span-2">
+            Event title
+            <input
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder="Birthday celebration"
+              className="h-12 rounded-lg border border-neutral-300 px-4 text-sm font-medium outline-none transition focus:border-neutral-950"
+            />
+          </label>
           <label className="flex flex-col gap-2 text-sm font-semibold text-neutral-800">
             Event type
             <select
@@ -137,7 +225,9 @@ export function PlannerForm() {
           <label className="flex flex-col gap-2 text-sm font-semibold text-neutral-800">
             Location
             <input
-              placeholder="Los Angeles, CA"
+              value={city}
+              onChange={(event) => setCity(event.target.value)}
+              placeholder="Los Angeles"
               className="h-12 rounded-lg border border-neutral-300 px-4 text-sm font-medium outline-none transition focus:border-neutral-950"
             />
           </label>
@@ -194,6 +284,17 @@ export function PlannerForm() {
               </button>
             ))}
           </div>
+          {!needsVenue ? (
+            <label className="mt-4 flex flex-col gap-2 text-sm font-semibold text-neutral-800">
+              Home or venue address
+              <input
+                value={address}
+                onChange={(event) => setAddress(event.target.value)}
+                placeholder="123 Main St, Los Angeles, CA"
+                className="h-12 rounded-lg border border-neutral-300 bg-white px-4 text-sm font-medium outline-none transition focus:border-neutral-950"
+              />
+            </label>
+          ) : null}
         </div>
 
         <div className="mt-7">
@@ -270,12 +371,32 @@ export function PlannerForm() {
           ) : null}
         </fieldset>
 
-        <Link
-          href={planHref}
-          className="mt-8 inline-flex h-12 items-center rounded-full bg-[#ff5a5f] px-7 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(255,90,95,0.25)] transition hover:-translate-y-0.5 hover:bg-[#e84f54] hover:shadow-[0_18px_36px_rgba(255,90,95,0.32)]"
-        >
-          Build my plan
-        </Link>
+        {error ? (
+          <p className="mt-6 rounded-lg bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+            {error}
+          </p>
+        ) : null}
+        {status ? (
+          <p className="mt-6 rounded-lg bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+            {status}
+          </p>
+        ) : null}
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+          <button
+            type="button"
+            onClick={saveEvent}
+            disabled={isSaving}
+            className="inline-flex h-12 items-center justify-center rounded-full bg-[#ff5a5f] px-7 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(255,90,95,0.25)] transition hover:-translate-y-0.5 hover:bg-[#e84f54] hover:shadow-[0_18px_36px_rgba(255,90,95,0.32)] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSaving ? "Saving..." : "Save event"}
+          </button>
+          <Link
+            href={planHref}
+            className="inline-flex h-12 items-center justify-center rounded-full border border-neutral-300 px-7 text-sm font-semibold text-neutral-950 transition hover:border-neutral-950"
+          >
+            View matched options
+          </Link>
+        </div>
       </form>
 
       <aside className="sticky top-24 h-fit rounded-lg bg-neutral-950 p-6 text-white shadow-[0_24px_70px_rgba(20,20,20,0.18)]">

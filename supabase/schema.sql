@@ -288,3 +288,167 @@ with check (
       and profiles.user_id = auth.uid()
   )
 );
+
+create policy "vendor_photos_public_read"
+on public.vendor_photos for select
+using (
+  exists (
+    select 1 from public.vendor_businesses
+    where vendor_businesses.id = vendor_photos.vendor_id
+      and vendor_businesses.approval_status = 'approved'
+  )
+);
+
+create policy "vendor_availability_public_read"
+on public.vendor_availability for select
+using (
+  exists (
+    select 1 from public.vendor_businesses
+    where vendor_businesses.id = vendor_availability.vendor_id
+      and vendor_businesses.approval_status = 'approved'
+  )
+);
+
+create policy "venues_public_approved_read"
+on public.venues for select
+using (approval_status = 'approved');
+
+create policy "venues_owner_all"
+on public.venues for all
+using (
+  owner_id is not null
+  and exists (
+    select 1 from public.profiles
+    where profiles.id = venues.owner_id
+      and profiles.user_id = auth.uid()
+  )
+)
+with check (
+  owner_id is not null
+  and exists (
+    select 1 from public.profiles
+    where profiles.id = venues.owner_id
+      and profiles.user_id = auth.uid()
+  )
+);
+
+create policy "cart_items_event_owner_all"
+on public.cart_items for all
+using (
+  exists (
+    select 1
+    from public.events
+    join public.profiles on profiles.id = events.planner_id
+    where events.id = cart_items.event_id
+      and profiles.user_id = auth.uid()
+  )
+)
+with check (
+  exists (
+    select 1
+    from public.events
+    join public.profiles on profiles.id = events.planner_id
+    where events.id = cart_items.event_id
+      and profiles.user_id = auth.uid()
+  )
+);
+
+create policy "quote_requests_planner_or_vendor_all"
+on public.quote_requests for all
+using (
+  exists (
+    select 1 from public.profiles
+    where profiles.id = quote_requests.planner_id
+      and profiles.user_id = auth.uid()
+  )
+  or exists (
+    select 1
+    from public.vendor_businesses
+    join public.profiles on profiles.id = vendor_businesses.owner_id
+    where vendor_businesses.id = quote_requests.vendor_id
+      and profiles.user_id = auth.uid()
+  )
+)
+with check (
+  exists (
+    select 1 from public.profiles
+    where profiles.id = quote_requests.planner_id
+      and profiles.user_id = auth.uid()
+  )
+  or exists (
+    select 1
+    from public.vendor_businesses
+    join public.profiles on profiles.id = vendor_businesses.owner_id
+    where vendor_businesses.id = quote_requests.vendor_id
+      and profiles.user_id = auth.uid()
+  )
+);
+
+create policy "bookings_planner_or_vendor_all"
+on public.bookings for all
+using (
+  exists (
+    select 1 from public.profiles
+    where profiles.id = bookings.planner_id
+      and profiles.user_id = auth.uid()
+  )
+  or exists (
+    select 1
+    from public.vendor_businesses
+    join public.profiles on profiles.id = vendor_businesses.owner_id
+    where vendor_businesses.id = bookings.vendor_id
+      and profiles.user_id = auth.uid()
+  )
+)
+with check (
+  exists (
+    select 1 from public.profiles
+    where profiles.id = bookings.planner_id
+      and profiles.user_id = auth.uid()
+  )
+  or exists (
+    select 1
+    from public.vendor_businesses
+    join public.profiles on profiles.id = vendor_businesses.owner_id
+    where vendor_businesses.id = bookings.vendor_id
+      and profiles.user_id = auth.uid()
+  )
+);
+
+create policy "messages_sender_or_receiver_all"
+on public.messages for all
+using (
+  exists (
+    select 1 from public.profiles
+    where profiles.id in (messages.sender_id, messages.receiver_id)
+      and profiles.user_id = auth.uid()
+  )
+)
+with check (
+  exists (
+    select 1 from public.profiles
+    where profiles.id = messages.sender_id
+      and profiles.user_id = auth.uid()
+  )
+);
+
+create policy "guests_event_owner_all"
+on public.guests for all
+using (
+  exists (
+    select 1
+    from public.events
+    join public.profiles on profiles.id = events.planner_id
+    where events.id = guests.event_id
+      and profiles.user_id = auth.uid()
+  )
+)
+with check (
+  exists (
+    select 1
+    from public.events
+    join public.profiles on profiles.id = events.planner_id
+    where events.id = guests.event_id
+      and profiles.user_id = auth.uid()
+  )
+);

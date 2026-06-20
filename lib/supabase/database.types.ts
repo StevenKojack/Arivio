@@ -38,6 +38,7 @@ export type Database = {
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
+        Relationships: [];
       };
       events: {
         Row: RowWithTimestamps & {
@@ -64,6 +65,7 @@ export type Database = {
           title: string;
         };
         Update: Partial<Database["public"]["Tables"]["events"]["Insert"]>;
+        Relationships: [];
       };
       vendor_businesses: {
         Row: RowWithTimestamps & {
@@ -88,6 +90,7 @@ export type Database = {
           owner_id: string;
         };
         Update: Partial<Database["public"]["Tables"]["vendor_businesses"]["Insert"]>;
+        Relationships: [];
       };
       vendor_services: {
         Row: {
@@ -112,6 +115,7 @@ export type Database = {
           vendor_id: string;
         };
         Update: Partial<Database["public"]["Tables"]["vendor_services"]["Insert"]>;
+        Relationships: [];
       };
       vendor_photos: {
         Row: {
@@ -125,6 +129,7 @@ export type Database = {
           vendor_id: string;
         };
         Update: Partial<Database["public"]["Tables"]["vendor_photos"]["Insert"]>;
+        Relationships: [];
       };
       vendor_availability: {
         Row: {
@@ -142,6 +147,7 @@ export type Database = {
           vendor_id: string;
         };
         Update: Partial<Database["public"]["Tables"]["vendor_availability"]["Insert"]>;
+        Relationships: [];
       };
       venues: {
         Row: {
@@ -167,6 +173,7 @@ export type Database = {
           name: string;
         };
         Update: Partial<Database["public"]["Tables"]["venues"]["Insert"]>;
+        Relationships: [];
       };
       cart_items: {
         Row: {
@@ -187,6 +194,7 @@ export type Database = {
           item_type: ItemType;
         };
         Update: Partial<Database["public"]["Tables"]["cart_items"]["Insert"]>;
+        Relationships: [];
       };
       quote_requests: {
         Row: RowWithTimestamps & {
@@ -209,6 +217,7 @@ export type Database = {
           planner_id: string;
         };
         Update: Partial<Database["public"]["Tables"]["quote_requests"]["Insert"]>;
+        Relationships: [];
       };
       bookings: {
         Row: RowWithTimestamps & {
@@ -231,6 +240,7 @@ export type Database = {
           planner_id: string;
         };
         Update: Partial<Database["public"]["Tables"]["bookings"]["Insert"]>;
+        Relationships: [];
       };
       messages: {
         Row: RowWithTimestamps & {
@@ -247,6 +257,7 @@ export type Database = {
           sender_id: string;
         };
         Update: Partial<Database["public"]["Tables"]["messages"]["Insert"]>;
+        Relationships: [];
       };
       guests: {
         Row: RowWithTimestamps & {
@@ -263,6 +274,7 @@ export type Database = {
           name: string;
         };
         Update: Partial<Database["public"]["Tables"]["guests"]["Insert"]>;
+        Relationships: [];
       };
     };
     Views: Record<string, never>;
