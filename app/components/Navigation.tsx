@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Logo } from "./Logo";
 
 const navItems = [
   { label: "Marketplace", href: "/marketplace" },
@@ -10,12 +11,7 @@ export function Navigation() {
   return (
     <header className="sticky top-0 z-20 border-b border-black/5 bg-white/85 px-6 backdrop-blur-xl sm:px-8 lg:px-12">
       <nav className="mx-auto flex h-[72px] max-w-7xl items-center justify-between">
-        <Link
-          href="/"
-          className="text-xl font-semibold tracking-tight text-neutral-950"
-        >
-          Arivio
-        </Link>
+        <Logo />
         <div className="hidden items-center gap-8 text-sm font-medium text-neutral-600 md:flex">
           {navItems.map((item) => (
             <Link

@@ -7,7 +7,7 @@ type MarketplaceCardProps = {
 
 export function MarketplaceCard({ item }: MarketplaceCardProps) {
   return (
-    <article className="flex h-full flex-col rounded-lg border border-neutral-200 bg-white p-5 shadow-[0_18px_44px_rgba(20,20,20,0.06)]">
+    <article className="group flex h-full flex-col rounded-lg border border-neutral-200 bg-white p-5 shadow-[0_18px_44px_rgba(20,20,20,0.06)] transition duration-300 hover:-translate-y-1 hover:border-neutral-300 hover:shadow-[0_24px_58px_rgba(20,20,20,0.1)]">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#e24b44]">
@@ -26,12 +26,22 @@ export function MarketplaceCard({ item }: MarketplaceCardProps) {
         {item.description}
       </p>
       <div className="mt-5 flex flex-wrap gap-2">
-        {item.tags.slice(0, 3).map((tag) => (
+        {item.events.slice(0, 3).map((tag) => (
           <span
             key={tag}
             className="rounded-full border border-neutral-200 px-3 py-1 text-xs font-medium text-neutral-600"
           >
             {tag}
+          </span>
+        ))}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {item.services.slice(0, 3).map((service) => (
+          <span
+            key={service}
+            className="rounded-full bg-[#fff5f5] px-3 py-1 text-xs font-semibold text-[#c33d38]"
+          >
+            {service}
           </span>
         ))}
       </div>

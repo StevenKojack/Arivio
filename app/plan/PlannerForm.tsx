@@ -2,29 +2,90 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { eventTypes } from "../data/marketplace";
-
-const serviceOptions = [
-  "Venue",
-  "Catering",
-  "Entertainment",
-  "Rentals",
-  "Invitations",
-  "Photography",
-];
+import {
+  allServices,
+  eventPlanPresets,
+  eventTypes,
+  type EventType,
+  type ServiceName,
+} from "../data/marketplace";
 
 export function PlannerForm() {
-  const [eventType, setEventType] = useState("Wedding");
-  const [guestCount, setGuestCount] = useState(120);
-  const [budget, setBudget] = useState(15000);
-  const [services, setServices] = useState(["Venue", "Catering", "Rentals"]);
+  const [eventType, setEventType] = useState<EventType>("Birthday");
+  const [guestCount, setGuestCount] = useState(40);
+  const [budget, setBudget] = useState(5000);
+  const [needsVenue, setNeedsVenue] = useState(true);
+  const [showMore, setShowMore] = useState(false);
+  const [services, setServices] = useState<ServiceName[]>(
+    eventPlanPresets.Birthday.recommended,
+  );
 
+  const preset = eventPlanPresets[eventType];
+  const recommendedServices = useMemo(
+    () =>
+      needsVenue
+        ? preset.recommended
+        : preset.recommended.filter((service) => service !== "Venue"),
+    [needsVenue, preset.recommended],
+  );
+  const moreServices = useMemo(
+    () =>
+      allServices.filter(
+        (service) =>
+          !recommendedServices.includes(service) &&
+          !preset.more.includes(service),
+      ),
+    [preset.more, recommendedServices],
+  );
+  const optionalServices = [...preset.more, ...moreServices];
+
+  const activeServices = useMemo(
+    () => services.filter((service) => needsVenue || service !== "Venue"),
+    [needsVenue, services],
+  );
   const budgetPerGuest = useMemo(
     () => Math.round(budget / Math.max(guestCount, 1)),
     [budget, guestCount],
   );
+  const planHref = useMemo(() => {
+    const params = new URLSearchParams({
+      event: eventType,
+      venue: needsVenue ? "yes" : "no",
+      guests: String(guestCount),
+      budget: String(budget),
+    });
 
-  function toggleService(service: string) {
+    if (activeServices.length > 0) {
+      params.set("services", activeServices.join(","));
+    }
+
+    return `/marketplace?${params.toString()}`;
+  }, [activeServices, budget, eventType, guestCount, needsVenue]);
+
+  function chooseEventType(nextEventType: EventType) {
+    const nextRecommended = eventPlanPresets[nextEventType].recommended;
+
+    setEventType(nextEventType);
+    setShowMore(false);
+    setServices(
+      needsVenue
+        ? nextRecommended
+        : nextRecommended.filter((service) => service !== "Venue"),
+    );
+  }
+
+  function chooseVenueNeed(nextNeedsVenue: boolean) {
+    setNeedsVenue(nextNeedsVenue);
+    setServices((current) => {
+      if (nextNeedsVenue) {
+        return current.includes("Venue") ? current : ["Venue", ...current];
+      }
+
+      return current.filter((service) => service !== "Venue");
+    });
+  }
+
+  function toggleService(service: ServiceName) {
     setServices((current) =>
       current.includes(service)
         ? current.filter((item) => item !== service)
@@ -40,7 +101,7 @@ export function PlannerForm() {
             Event type
             <select
               value={eventType}
-              onChange={(event) => setEventType(event.target.value)}
+              onChange={(event) => chooseEventType(event.target.value as EventType)}
               className="h-12 rounded-lg border border-neutral-300 bg-white px-4 text-sm font-medium outline-none transition focus:border-neutral-950"
             >
               {eventTypes.map((type) => (
@@ -74,6 +135,28 @@ export function PlannerForm() {
           </label>
         </div>
 
+        <div className="mt-7 rounded-lg bg-[#f7f7f5] p-4">
+          <p className="text-sm font-semibold text-neutral-800">
+            Do you need a venue?
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            {[true, false].map((value) => (
+              <button
+                key={String(value)}
+                type="button"
+                onClick={() => chooseVenueNeed(value)}
+                className={`h-11 rounded-full text-sm font-semibold transition ${
+                  needsVenue === value
+                    ? "bg-neutral-950 text-white shadow-[0_12px_24px_rgba(20,20,20,0.16)]"
+                    : "border border-neutral-300 bg-white text-neutral-700 hover:border-neutral-950"
+                }`}
+              >
+                {value ? "Yes, find venues" : "No, I have one"}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="mt-7">
           <div className="flex items-center justify-between gap-4">
             <label
@@ -99,36 +182,64 @@ export function PlannerForm() {
         </div>
 
         <fieldset className="mt-8">
-          <legend className="text-sm font-semibold text-neutral-800">
-            Services needed
-          </legend>
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <legend className="text-sm font-semibold text-neutral-800">
+                Recommended for a {eventType.toLowerCase()}
+              </legend>
+              <p className="mt-1 text-sm text-neutral-500">
+                These options change based on the event you pick.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowMore((current) => !current)}
+              className="h-10 rounded-full border border-neutral-300 px-4 text-sm font-semibold text-neutral-950 transition hover:border-neutral-950"
+            >
+              {showMore ? "Show less" : "More options"}
+            </button>
+          </div>
+
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {serviceOptions.map((service) => (
-              <label
+            {recommendedServices.map((service) => (
+              <ServiceToggle
                 key={service}
-                className="flex cursor-pointer items-center gap-3 rounded-lg border border-neutral-200 p-4 text-sm font-medium text-neutral-700 transition hover:border-neutral-400"
-              >
-                <input
-                  type="checkbox"
-                  checked={services.includes(service)}
-                  onChange={() => toggleService(service)}
-                  className="h-4 w-4 accent-[#ff5a5f]"
-                />
-                {service}
-              </label>
+                service={service}
+                checked={activeServices.includes(service)}
+                recommended
+                onChange={() => toggleService(service)}
+              />
             ))}
           </div>
+
+          {showMore ? (
+            <div className="mt-5 animate-[fadeUp_240ms_ease-out] rounded-lg border border-neutral-200 bg-[#fbfbfa] p-4">
+              <p className="text-sm font-semibold text-neutral-800">
+                Everything else available
+              </p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {optionalServices.map((service) => (
+                  <ServiceToggle
+                    key={service}
+                    service={service}
+                    checked={activeServices.includes(service)}
+                    onChange={() => toggleService(service)}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : null}
         </fieldset>
 
-        <button
-          type="button"
-          className="mt-8 h-12 rounded-full bg-[#ff5a5f] px-7 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(255,90,95,0.25)] transition hover:bg-[#e84f54]"
+        <Link
+          href={planHref}
+          className="mt-8 inline-flex h-12 items-center rounded-full bg-[#ff5a5f] px-7 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(255,90,95,0.25)] transition hover:-translate-y-0.5 hover:bg-[#e84f54] hover:shadow-[0_18px_36px_rgba(255,90,95,0.32)]"
         >
           Build my plan
-        </button>
+        </Link>
       </form>
 
-      <aside className="rounded-lg bg-neutral-950 p-6 text-white">
+      <aside className="sticky top-24 h-fit rounded-lg bg-neutral-950 p-6 text-white shadow-[0_24px_70px_rgba(20,20,20,0.18)]">
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#ff8b8f]">
           Plan preview
         </p>
@@ -136,6 +247,12 @@ export function PlannerForm() {
           {eventType} for {guestCount.toLocaleString()} guests
         </h2>
         <div className="mt-8 space-y-4">
+          <div className="rounded-lg border border-white/10 p-4">
+            <p className="text-sm text-neutral-400">Venue search</p>
+            <p className="mt-1 text-xl font-semibold">
+              {needsVenue ? "Included" : "Not needed"}
+            </p>
+          </div>
           <div className="rounded-lg border border-white/10 p-4">
             <p className="text-sm text-neutral-400">Estimated budget</p>
             <p className="mt-1 text-2xl font-semibold">
@@ -147,19 +264,60 @@ export function PlannerForm() {
             <p className="mt-1 text-2xl font-semibold">${budgetPerGuest}</p>
           </div>
           <div className="rounded-lg border border-white/10 p-4">
-            <p className="text-sm text-neutral-400">Shortlist focus</p>
+            <p className="text-sm text-neutral-400">Booking categories</p>
             <p className="mt-1 text-base font-semibold">
-              {services.length ? services.join(", ") : "Choose services"}
+              {activeServices.length
+                ? activeServices.join(", ")
+                : "Choose services"}
             </p>
           </div>
         </div>
         <Link
-          href="/marketplace"
-          className="mt-8 inline-flex h-11 items-center rounded-full bg-white px-5 text-sm font-semibold text-neutral-950"
+          href={planHref}
+          className="mt-8 inline-flex h-11 items-center rounded-full bg-white px-5 text-sm font-semibold text-neutral-950 transition hover:bg-neutral-100"
         >
           View matched options
         </Link>
       </aside>
     </div>
+  );
+}
+
+type ServiceToggleProps = {
+  service: ServiceName;
+  checked: boolean;
+  recommended?: boolean;
+  onChange: () => void;
+};
+
+function ServiceToggle({
+  service,
+  checked,
+  recommended,
+  onChange,
+}: ServiceToggleProps) {
+  return (
+    <label
+      className={`group flex cursor-pointer items-center justify-between gap-3 rounded-lg border p-4 text-sm font-medium transition hover:-translate-y-0.5 ${
+        checked
+          ? "border-neutral-950 bg-white shadow-[0_14px_28px_rgba(20,20,20,0.08)]"
+          : "border-neutral-200 bg-white text-neutral-700 hover:border-neutral-400"
+      }`}
+    >
+      <span className="flex items-center gap-3">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={onChange}
+          className="h-4 w-4 accent-[#ff5a5f]"
+        />
+        {service}
+      </span>
+      {recommended ? (
+        <span className="rounded-full bg-[#fff1f1] px-2 py-1 text-[11px] font-semibold text-[#d6423d]">
+          Suggested
+        </span>
+      ) : null}
+    </label>
   );
 }
