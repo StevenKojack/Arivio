@@ -32,9 +32,20 @@ export function MarketplaceCard({
               {item.name}
             </h3>
           </div>
-          <span className="rounded-full bg-neutral-100 px-3 py-1 text-sm font-semibold text-neutral-800">
-            {item.rating.toFixed(2)}
-          </span>
+          <div className="grid justify-items-end gap-2">
+            <span className="rounded-full bg-neutral-100 px-3 py-1 text-sm font-semibold text-neutral-800">
+              {item.rating.toFixed(2)}
+            </span>
+            {!item.databaseSource ? (
+              <span className="rounded-full bg-[#fff5f5] px-3 py-1 text-xs font-semibold text-[#c33d38]">
+                Demo provider
+              </span>
+            ) : (
+              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                Database provider
+              </span>
+            )}
+          </div>
         </div>
         <p className="mt-3 text-sm font-medium text-neutral-500">{item.location}</p>
         <p className="mt-1 text-xs text-neutral-400">{item.address}</p>
@@ -92,14 +103,20 @@ export function MarketplaceCard({
         </div>
 
         <div className="mt-5 border-t border-neutral-100 pt-4">
-          <a
-            href={item.sourceUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="mb-4 inline-flex text-xs font-semibold text-[#c33d38] transition hover:text-neutral-950"
-          >
-            Verify: {item.sourceLabel}
-          </a>
+          {item.sourceUrl !== "#" ? (
+            <a
+              href={item.sourceUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mb-4 inline-flex text-xs font-semibold text-[#c33d38] transition hover:text-neutral-950"
+            >
+              Verify: {item.sourceLabel}
+            </a>
+          ) : (
+            <p className="mb-4 text-xs font-semibold text-neutral-500">
+              {item.sourceLabel}
+            </p>
+          )}
           <div className="flex items-center justify-between">
           <div>
             <p className="text-xs text-neutral-500">Listed from</p>

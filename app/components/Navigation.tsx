@@ -4,6 +4,7 @@ import { Logo } from "./Logo";
 const navItems = [
   { label: "Marketplace", href: "/marketplace" },
   { label: "Plan", href: "/plan" },
+  { label: "Vendor", href: "/vendor/dashboard" },
   { label: "Account", href: "/account" },
   { label: "Setup", href: "/setup" },
 ];

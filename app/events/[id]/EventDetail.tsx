@@ -78,7 +78,7 @@ export function EventDetail({ eventId }: { eventId: string }) {
             {event.title}
           </h1>
           <p className="mt-4 text-lg text-neutral-600">
-            {event.event_type} · {event.date ?? "No date"} ·{" "}
+            {event.event_type} - {event.date ?? "No date"} -{" "}
             {event.guest_count ?? 0} guests
           </p>
         </div>
@@ -87,7 +87,9 @@ export function EventDetail({ eventId }: { eventId: string }) {
             event.event_type,
           )}&guests=${event.guest_count ?? 40}&budget=${
             event.budget_max ?? 5000
-          }&date=${event.date ?? ""}&time=${event.start_time ?? "14:00"}`}
+          }&date=${event.date ?? ""}&time=${
+            event.start_time?.slice(0, 5) ?? "14:00"
+          }&eventId=${event.id}`}
           className="rounded-full bg-[#ff5a5f] px-5 py-3 text-sm font-semibold text-white"
         >
           Browse vendors
@@ -105,12 +107,12 @@ export function EventDetail({ eventId }: { eventId: string }) {
           {cartItems.length ? (
             cartItems.map((item) => (
               <p key={item.id} className="rounded-lg border border-neutral-200 p-4 text-sm">
-                {item.item_type} · ${Number(item.estimated_price ?? 0).toLocaleString()}
+                {item.item_type} - ${Number(item.estimated_price ?? 0).toLocaleString()}
               </p>
             ))
           ) : (
             <p className="text-sm text-neutral-600">
-              No saved cart items yet. Marketplace database cart save comes next.
+              No saved cart items yet. Add database providers from the marketplace.
             </p>
           )}
         </Panel>
@@ -118,12 +120,15 @@ export function EventDetail({ eventId }: { eventId: string }) {
           {quotes.length ? (
             quotes.map((quote) => (
               <p key={quote.id} className="rounded-lg border border-neutral-200 p-4 text-sm">
-                {quote.status} · ${Number(quote.estimated_price ?? 0).toLocaleString()}
+                {quote.status} - $
+                {Number(
+                  quote.vendor_final_price ?? quote.estimated_price ?? 0,
+                ).toLocaleString()}
               </p>
             ))
           ) : (
             <p className="text-sm text-neutral-600">
-              No quote requests yet. Send requests after adding cart persistence.
+              No quote requests yet. Add providers to the cart, then request quotes.
             </p>
           )}
         </Panel>

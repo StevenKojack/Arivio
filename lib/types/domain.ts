@@ -11,6 +11,7 @@ export type EventStatus =
   | "cancelled";
 
 export type QuoteStatus =
+  | "pending"
   | "draft"
   | "sent"
   | "accepted"

@@ -65,6 +65,7 @@ export function VendorOnboardingForm() {
           business_name: businessName,
           category,
           description: description || null,
+          approval_status: "approved",
           owner_id: profile.id,
           phone: phone || null,
           service_area_city: city,

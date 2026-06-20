@@ -66,6 +66,7 @@ export type AvailabilityWindow = {
 
 export type MarketplaceItem = {
   id: number;
+  databaseSource?: boolean;
   name: string;
   type: ServiceName;
   location: string;
@@ -81,6 +82,10 @@ export type MarketplaceItem = {
   availability: AvailabilityWindow[];
   sourceLabel: string;
   sourceUrl: string;
+  serviceRadiusMiles?: number;
+  vendorId?: string | null;
+  serviceId?: string | null;
+  venueId?: string | null;
 };
 
 export type QuoteContext = {

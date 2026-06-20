@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { MarketplaceCard } from "../components/MarketplaceCard";
 import {
@@ -22,15 +23,34 @@ import {
   type QuoteContext,
   type ServiceName,
 } from "../data/marketplace";
+import { createBrowserSupabaseClient, hasSupabaseConfig } from "@/lib/supabase/client";
+import type { PublicTableRow } from "@/lib/supabase/database.types";
+import {
+  createCartItem,
+  createQuoteRequestsFromCart,
+  getEventById,
+  getMarketplaceProviders,
+} from "@/lib/supabase/marketplace";
+import { ensureCurrentProfile } from "@/lib/supabase/profiles";
 
 type MarketplaceFilter = (typeof marketplaceTypes)[number];
+type EventRow = PublicTableRow<"events">;
+type ProfileRow = PublicTableRow<"profiles">;
 type CartLine = {
+  cartItemId?: string;
   id: number;
   item: MarketplaceItem;
+  persisted: boolean;
   serviceEnd: string;
   serviceStart: string;
 };
-const venueItems = marketplaceItems.filter((item) => item.type === "Venue");
+
+function demoItems() {
+  return marketplaceItems.map((item) => ({
+    ...item,
+    databaseSource: false,
+  }));
+}
 
 function isEventType(value: string | null): value is EventType {
   return eventTypes.includes(value as EventType);
@@ -43,6 +63,7 @@ function isServiceName(value: string): value is ServiceName {
 export function MarketplaceBrowser() {
   const searchParams = useSearchParams();
   const initialEvent = searchParams.get("event");
+  const eventId = searchParams.get("eventId");
   const initialServices = searchParams
     .get("services")
     ?.split(",")
@@ -52,6 +73,12 @@ export function MarketplaceBrowser() {
   const initialBudget = searchParams.get("budget");
   const initialRecommendedServices =
     initialEventType === "All" ? [] : eventPlanPresets[initialEventType].recommended;
+  const [providers, setProviders] = useState<MarketplaceItem[]>(demoItems);
+  const [marketplaceMessage, setMarketplaceMessage] = useState(
+    "Loading marketplace providers...",
+  );
+  const [profile, setProfile] = useState<ProfileRow | null>(null);
+  const [savedEvent, setSavedEvent] = useState<EventRow | null>(null);
   const [selectedType, setSelectedType] = useState<MarketplaceFilter>("All");
   const [selectedEvent, setSelectedEvent] = useState<EventType | "All">(
     initialEventType,
@@ -74,16 +101,11 @@ export function MarketplaceBrowser() {
   const [homeAreaName, setHomeAreaName] = useState(homeAreas[0].name);
   const [liveCoordinates, setLiveCoordinates] = useState<Coordinates | null>(null);
   const [locationStatus, setLocationStatus] = useState("");
-  const [selectedVenueId, setSelectedVenueId] = useState<number | null>(() => {
-    if (!isEventType(initialEvent)) {
-      return null;
-    }
-
-    return (
-      venueItems.find((venue) => venue.events.includes(initialEvent))?.id ?? null
-    );
-  });
+  const [selectedVenueId, setSelectedVenueId] = useState<number | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
+  const [cartMessage, setCartMessage] = useState("");
+  const [isRequestingQuotes, setIsRequestingQuotes] = useState(false);
+  const venueItems = providers.filter((item) => item.type === "Venue");
   const durationHours = getHoursBetween(startTime, endTime);
   const globalQuoteContext: QuoteContext = {
     date: eventDate,
@@ -99,16 +121,25 @@ export function MarketplaceBrowser() {
   const homeCoordinates = liveCoordinates ?? homeArea.coordinates;
   const eventCoordinates: Coordinates | undefined = useHomeVenue
     ? homeCoordinates
-    : selectedVenue?.coordinates;
+    : selectedVenue?.coordinates ??
+      (savedEvent?.latitude && savedEvent.longitude
+        ? { lat: savedEvent.latitude, lng: savedEvent.longitude }
+        : undefined);
   const providerEstimates = eventCoordinates
-    ? marketplaceItems
+    ? providers
         .filter((item) => item.type !== "Venue")
         .map((item) => ({
           driveMinutes: estimateDriveMinutes(eventCoordinates, item.coordinates),
           item,
           miles: getDistanceMiles(eventCoordinates, item.coordinates),
         }))
-        .filter((estimate) => estimate.driveMinutes <= 60)
+        .filter((estimate) => {
+          const withinRadius = estimate.item.serviceRadiusMiles
+            ? estimate.miles <= estimate.item.serviceRadiusMiles
+            : true;
+
+          return estimate.driveMinutes <= 60 && withinRadius;
+        })
         .sort((a, b) => a.driveMinutes - b.driveMinutes)
     : [];
   const visibleMarketplaceTypes =
@@ -128,8 +159,7 @@ export function MarketplaceBrowser() {
   ]
     .filter(Boolean)
     .join(" - ");
-
-  const filteredItems = marketplaceItems.filter((item) => {
+  const filteredItems = providers.filter((item) => {
     const matchesType = selectedType === "All" || item.type === selectedType;
     const matchesEvent =
       selectedEvent === "All" || item.events.includes(selectedEvent);
@@ -143,6 +173,19 @@ export function MarketplaceBrowser() {
     const driveMinutes = eventCoordinates
       ? estimateDriveMinutes(eventCoordinates, item.coordinates)
       : 0;
+    const miles = eventCoordinates
+      ? getDistanceMiles(eventCoordinates, item.coordinates)
+      : 0;
+    const matchesCity =
+      !savedEvent?.city ||
+      item.type === "Venue" ||
+      item.location.toLowerCase().includes(savedEvent.city.toLowerCase()) ||
+      item.address.toLowerCase().includes(savedEvent.city.toLowerCase());
+    const withinRadius =
+      !eventCoordinates ||
+      item.type === "Venue" ||
+      !item.serviceRadiusMiles ||
+      miles <= item.serviceRadiusMiles;
     const isNearEnough =
       !eventCoordinates || item.type === "Venue" || driveMinutes <= 60;
 
@@ -151,10 +194,74 @@ export function MarketplaceBrowser() {
       matchesEvent &&
       matchesServices &&
       matchesQuery &&
+      matchesCity &&
+      withinRadius &&
       isNearEnough
     );
   });
   const cartTotal = cart.reduce((total, line) => total + getLineQuote(line), 0);
+  const canSaveCart = Boolean(profile && savedEvent);
+
+  useEffect(() => {
+    async function loadMarketplace() {
+      if (!hasSupabaseConfig()) {
+        setProviders(demoItems());
+        setMarketplaceMessage(
+          "Supabase needs a real project URL. Showing demo providers until the database is connected.",
+        );
+        return;
+      }
+
+      try {
+        const supabase = createBrowserSupabaseClient();
+        const { data: sessionData } = await supabase.auth.getSession();
+        const user = sessionData.session?.user;
+
+        if (user) {
+          const currentProfile = await ensureCurrentProfile(supabase, user);
+          setProfile(currentProfile);
+        }
+
+        if (eventId) {
+          const eventRow = await getEventById(supabase, eventId);
+          setSavedEvent(eventRow);
+          setEventDate(eventRow.date ?? eventDate);
+          setStartTime(eventRow.start_time?.slice(0, 5) ?? startTime);
+          setEndTime(eventRow.end_time?.slice(0, 5) ?? endTime);
+          setGuestCount(eventRow.guest_count ?? guestCount);
+          if (isEventType(eventRow.event_type)) {
+            chooseEventType(eventRow.event_type);
+          }
+        }
+
+        const databaseProviders = await getMarketplaceProviders(supabase);
+
+        if (databaseProviders.length) {
+          setProviders(databaseProviders);
+          setMarketplaceMessage(
+            "Showing approved database providers from Supabase.",
+          );
+          return;
+        }
+
+        setProviders(demoItems());
+        setMarketplaceMessage(
+          "No approved database providers were found. Showing demo providers with clear demo labels.",
+        );
+      } catch (error) {
+        setProviders(demoItems());
+        setMarketplaceMessage(
+          error instanceof Error
+            ? `${error.message}. Showing demo providers until Supabase data is ready.`
+            : "Unable to load database providers. Showing demo providers.",
+        );
+      }
+    }
+
+    loadMarketplace();
+    // The initial URL params should seed the browser once when the route loads.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventId]);
 
   function getLineContext(line: CartLine): QuoteContext {
     return {
@@ -194,11 +301,7 @@ export function MarketplaceBrowser() {
     setSelectedServices(
       nextEvent === "All" ? [] : eventPlanPresets[nextEvent].recommended,
     );
-    setSelectedVenueId(
-      nextEvent === "All"
-        ? null
-        : venueItems.find((venue) => venue.events.includes(nextEvent))?.id ?? null,
-    );
+    setSelectedVenueId(null);
   }
 
   function useCurrentLocation() {
@@ -237,34 +340,170 @@ export function MarketplaceBrowser() {
     );
   }
 
-  function addToCart(item: MarketplaceItem) {
-    setCart((current) => {
-      if (current.some((line) => line.item.id === item.id)) {
-        return current;
-      }
+  async function addToCart(item: MarketplaceItem) {
+    if (cart.some((line) => line.item.id === item.id)) {
+      return;
+    }
 
-      return [
-        ...current,
-        {
-          id: Date.now(),
-          item,
-          serviceEnd: endTime,
-          serviceStart: startTime,
-        },
-      ];
-    });
+    const lineId = Date.now();
+    const line: CartLine = {
+      id: lineId,
+      item,
+      persisted: false,
+      serviceEnd: endTime,
+      serviceStart: startTime,
+    };
+
+    setCart((current) => [...current, line]);
+
+    if (!profile || !savedEvent) {
+      setCartMessage("Log in to save your quote cart.");
+      return;
+    }
+
+    if (!item.databaseSource) {
+      setCartMessage("Demo providers stay local. Add a database provider to save quote cart items.");
+      return;
+    }
+
+    try {
+      const supabase = createBrowserSupabaseClient();
+      const estimatedPrice = quoteItem(item, {
+        date: eventDate,
+        durationHours,
+        endTime,
+        guests: guestCount,
+        startTime,
+      });
+      const cartItem = await createCartItem(supabase, {
+        endTime,
+        estimatedPrice,
+        eventId: savedEvent.id,
+        itemType: item.type === "Venue" ? "venue" : "vendor_service",
+        serviceId: item.serviceId ?? null,
+        startTime,
+        vendorId: item.vendorId ?? null,
+        venueId: item.venueId ?? null,
+      });
+
+      setCart((current) =>
+        current.map((currentLine) =>
+          currentLine.id === lineId
+            ? { ...currentLine, cartItemId: cartItem.id, persisted: true }
+            : currentLine,
+        ),
+      );
+      setCartMessage("Quote cart item saved to Supabase.");
+    } catch (error) {
+      setCartMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to save this cart item yet.",
+      );
+    }
   }
 
   function removeFromCart(itemId: number) {
     setCart((current) => current.filter((line) => line.item.id !== itemId));
   }
 
-  function updateCartTime(itemId: number, field: "serviceStart" | "serviceEnd", value: string) {
+  async function updateCartTime(
+    itemId: number,
+    field: "serviceStart" | "serviceEnd",
+    value: string,
+  ) {
+    const existingLine = cart.find((line) => line.item.id === itemId);
+    const nextLine = existingLine
+      ? {
+          ...existingLine,
+          [field]: value,
+        }
+      : null;
+
     setCart((current) =>
       current.map((line) =>
         line.item.id === itemId ? { ...line, [field]: value } : line,
       ),
     );
+
+    if (!nextLine?.cartItemId || !savedEvent || !nextLine.item.databaseSource) {
+      return;
+    }
+
+    try {
+      const supabase = createBrowserSupabaseClient();
+      const { error } = await supabase
+        .from("cart_items")
+        .update({
+          end_time: nextLine.serviceEnd,
+          estimated_price: quoteItem(nextLine.item, getLineContext(nextLine)),
+          start_time: nextLine.serviceStart,
+        })
+        .eq("id", nextLine.cartItemId)
+        .eq("event_id", savedEvent.id);
+
+      if (error) {
+        throw error;
+      }
+    } catch (error) {
+      setCartMessage(
+        error instanceof Error ? error.message : "Unable to sync cart item time.",
+      );
+    }
+  }
+
+  async function requestQuotes() {
+    setCartMessage("");
+
+    if (!cart.length) {
+      setCartMessage("Add providers before requesting quotes.");
+      return;
+    }
+
+    if (!profile || !savedEvent) {
+      setCartMessage("Log in to save your quote cart.");
+      return;
+    }
+
+    const persistedDatabaseLines = cart.filter(
+      (line) => line.persisted && line.cartItemId && line.item.databaseSource,
+    );
+
+    if (!persistedDatabaseLines.length) {
+      setCartMessage("Only saved database providers can receive quote requests.");
+      return;
+    }
+
+    setIsRequestingQuotes(true);
+
+    try {
+      const supabase = createBrowserSupabaseClient();
+      const requests = await createQuoteRequestsFromCart(supabase, {
+        cartItems: persistedDatabaseLines.map((line) => ({
+          end_time: line.serviceEnd,
+          estimated_price: getLineQuote(line),
+          event_id: savedEvent.id,
+          id: line.cartItemId ?? String(line.id),
+          service_id: line.item.serviceId ?? null,
+          start_time: line.serviceStart,
+          vendor_id: line.item.vendorId ?? null,
+          venue_id: line.item.venueId ?? null,
+        })),
+        event: savedEvent,
+        message: "Quote requested from Arivio marketplace cart.",
+        plannerId: profile.id,
+      });
+
+      setCartMessage(
+        `${requests.length} quote request${requests.length === 1 ? "" : "s"} sent. Status starts as pending.`,
+      );
+    } catch (error) {
+      setCartMessage(
+        error instanceof Error ? error.message : "Unable to request quotes.",
+      );
+    } finally {
+      setIsRequestingQuotes(false);
+    }
   }
 
   return (
@@ -276,6 +515,21 @@ export function MarketplaceBrowser() {
               Matches for {planSummary}
             </div>
           ) : null}
+
+          <div className="mb-4 grid gap-3 md:grid-cols-2">
+            <p className="rounded-lg border border-neutral-200 bg-[#fbfbfa] px-4 py-3 text-sm font-semibold text-neutral-700">
+              {marketplaceMessage}
+            </p>
+            {!canSaveCart ? (
+              <p className="rounded-lg border border-[#ffd6d7] bg-[#fff8f8] px-4 py-3 text-sm font-semibold text-[#b73532]">
+                Log in to save your quote cart.
+              </p>
+            ) : (
+              <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
+                Cart saves to event: {savedEvent?.title}
+              </p>
+            )}
+          </div>
 
           <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
             <input
@@ -557,6 +811,21 @@ export function MarketplaceBrowser() {
           </p>
         </div>
 
+        {!canSaveCart ? (
+          <Link
+            href="/auth/login"
+            className="mt-4 block rounded-lg border border-[#ff8b8f]/40 bg-[#ff5a5f]/10 px-4 py-3 text-sm font-semibold text-[#ffd5d7]"
+          >
+            Log in to save your quote cart.
+          </Link>
+        ) : null}
+
+        {cartMessage ? (
+          <p className="mt-4 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white">
+            {cartMessage}
+          </p>
+        ) : null}
+
         <div className="mt-5 space-y-3">
           {cart.length ? (
             cart.map((line) => {
@@ -578,6 +847,13 @@ export function MarketplaceBrowser() {
                       <p className="font-semibold">{line.item.name}</p>
                       <p className="mt-1 text-xs font-medium text-neutral-500">
                         {line.item.type} - {line.item.pricing.label}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold text-neutral-500">
+                        {line.persisted
+                          ? "Saved cart item"
+                          : line.item.databaseSource
+                            ? "Not saved yet"
+                            : "Demo provider"}
                       </p>
                     </div>
                     <button
@@ -633,14 +909,16 @@ export function MarketplaceBrowser() {
                         {lineAvailable ? "Available for this window" : "Check this time"}
                       </p>
                     </div>
-                    <a
-                      href={line.item.sourceUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs font-semibold text-[#c33d38]"
-                    >
-                      Source
-                    </a>
+                    {line.item.sourceUrl !== "#" ? (
+                      <a
+                        href={line.item.sourceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs font-semibold text-[#c33d38]"
+                      >
+                        Source
+                      </a>
+                    ) : null}
                   </div>
                 </div>
               );
@@ -661,9 +939,11 @@ export function MarketplaceBrowser() {
           </div>
           <button
             type="button"
-            className="mt-5 h-12 w-full rounded-full bg-[#ff5a5f] text-sm font-semibold text-white shadow-[0_14px_30px_rgba(255,90,95,0.25)] transition hover:-translate-y-0.5 hover:bg-[#e84f54]"
+            onClick={requestQuotes}
+            disabled={isRequestingQuotes}
+            className="mt-5 h-12 w-full rounded-full bg-[#ff5a5f] text-sm font-semibold text-white shadow-[0_14px_30px_rgba(255,90,95,0.25)] transition hover:-translate-y-0.5 hover:bg-[#e84f54] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Request all quotes
+            {isRequestingQuotes ? "Requesting..." : "Request quotes"}
           </button>
         </div>
       </aside>
@@ -727,8 +1007,7 @@ function LocationEstimatePanel({
       <div className="rounded-lg border border-white/10 p-3 md:col-span-4">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <p className="text-sm text-neutral-300">
-            Normal traffic estimate uses local coordinates until Google Routes
-            API is connected.
+            Normal traffic estimate uses local coordinates until a routing API is connected.
           </p>
           <p className="text-sm font-semibold text-white">
             Farthest shown: {longestDrive ? `${longestDrive.driveMinutes} min` : "--"}
@@ -769,10 +1048,10 @@ function VenueMap({
     : venues;
   const lats = points.map((point) => point.coordinates.lat);
   const lngs = points.map((point) => point.coordinates.lng);
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs);
-  const maxLng = Math.max(...lngs);
+  const minLat = lats.length ? Math.min(...lats) : 34.02;
+  const maxLat = lats.length ? Math.max(...lats) : 34.12;
+  const minLng = lngs.length ? Math.min(...lngs) : -118.45;
+  const maxLng = lngs.length ? Math.max(...lngs) : -118.2;
 
   function toPosition(point: Coordinates) {
     const x = ((point.lng - minLng) / Math.max(maxLng - minLng, 0.01)) * 74 + 13;
@@ -787,27 +1066,33 @@ function VenueMap({
       <div className="absolute left-4 top-4 z-10 rounded-full bg-white px-3 py-1 text-xs font-semibold text-neutral-700 shadow">
         Venue map
       </div>
-      <div className="absolute bottom-4 left-4 z-10 rounded-lg bg-white/90 px-3 py-2 text-xs font-medium text-neutral-600 shadow">
-        Map is a local prototype view. Pins use stored LA coordinates.
+      <div className="absolute bottom-4 left-4 z-10 max-w-[70%] rounded-lg bg-white/90 px-3 py-2 text-xs font-medium text-neutral-600 shadow">
+        Map is a local prototype view. Pins use stored coordinates.
       </div>
-      {points.map((point) => {
-        const position = toPosition(point.coordinates);
-        const isSelected = point.id === selectedVenueId || useHomeVenue;
+      {points.length ? (
+        points.map((point) => {
+          const position = toPosition(point.coordinates);
+          const isSelected = point.id === selectedVenueId || useHomeVenue;
 
-        return (
-          <button
-            key={point.id}
-            type="button"
-            onClick={() => !useHomeVenue && onSelectVenue(point.id)}
-            className={`absolute z-20 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white px-3 py-2 text-xs font-semibold shadow-[0_12px_30px_rgba(20,20,20,0.2)] transition hover:-translate-y-[55%] ${
-              isSelected ? "bg-[#ff5a5f] text-white" : "bg-neutral-950 text-white"
-            }`}
-            style={{ left: `${position.x}%`, top: `${position.y}%` }}
-          >
-            {point.name}
-          </button>
-        );
-      })}
+          return (
+            <button
+              key={point.id}
+              type="button"
+              onClick={() => !useHomeVenue && onSelectVenue(point.id)}
+              className={`absolute z-20 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white px-3 py-2 text-xs font-semibold shadow-[0_12px_30px_rgba(20,20,20,0.2)] transition hover:-translate-y-[55%] ${
+                isSelected ? "bg-[#ff5a5f] text-white" : "bg-neutral-950 text-white"
+              }`}
+              style={{ left: `${position.x}%`, top: `${position.y}%` }}
+            >
+              {point.name}
+            </button>
+          );
+        })
+      ) : (
+        <div className="absolute inset-0 z-10 flex items-center justify-center px-6 text-center text-sm font-semibold text-neutral-600">
+          Add approved venue providers to Supabase to populate the map.
+        </div>
+      )}
     </div>
   );
 }

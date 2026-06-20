@@ -9,11 +9,13 @@ import type { PublicTableRow } from "@/lib/supabase/database.types";
 type EventRow = PublicTableRow<"events">;
 type VendorBusinessRow = PublicTableRow<"vendor_businesses">;
 type ProfileRow = PublicTableRow<"profiles">;
+type QuoteRequestRow = PublicTableRow<"quote_requests">;
 
 export function AccountDashboard() {
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [vendors, setVendors] = useState<VendorBusinessRow[]>([]);
+  const [quoteRequests, setQuoteRequests] = useState<QuoteRequestRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState("");
 
@@ -51,9 +53,18 @@ export function AccountDashboard() {
           .select("*")
           .eq("owner_id", currentProfile.id)
           .order("created_at", { ascending: false });
+        const eventIds = (eventRows ?? []).map((eventRow) => eventRow.id);
+        const { data: quoteRows } = eventIds.length
+          ? await supabase
+              .from("quote_requests")
+              .select("*")
+              .in("event_id", eventIds)
+              .order("created_at", { ascending: false })
+          : { data: [] };
 
         setEvents(eventRows ?? []);
         setVendors(vendorRows ?? []);
+        setQuoteRequests(quoteRows ?? []);
       } catch (error) {
         setMessage(
           error instanceof Error ? error.message : "Unable to load dashboard.",
@@ -119,6 +130,12 @@ export function AccountDashboard() {
             List services
           </Link>
           <Link
+            href="/vendor/dashboard"
+            className="rounded-full border border-neutral-300 px-5 py-3 text-sm font-semibold text-neutral-950"
+          >
+            Vendor dashboard
+          </Link>
+          <Link
             href="/auth/logout"
             className="rounded-full border border-neutral-300 px-5 py-3 text-sm font-semibold text-neutral-950"
           >
@@ -142,7 +159,7 @@ export function AccountDashboard() {
                     <div>
                       <p className="font-semibold text-neutral-950">{event.title}</p>
                       <p className="mt-1 text-sm text-neutral-500">
-                        {event.event_type} · {event.date ?? "No date"} ·{" "}
+                        {event.event_type} - {event.date ?? "No date"} -{" "}
                         {event.guest_count ?? 0} guests
                       </p>
                     </div>
@@ -170,7 +187,7 @@ export function AccountDashboard() {
                     {vendor.business_name}
                   </p>
                   <p className="mt-1 text-sm text-neutral-500">
-                    {vendor.category} · {vendor.approval_status}
+                    {vendor.category} - {vendor.approval_status}
                   </p>
                 </article>
               ))
@@ -182,6 +199,67 @@ export function AccountDashboard() {
           </div>
         </section>
       </div>
+
+      <section className="mt-5 rounded-lg border border-neutral-200 bg-white p-6 shadow-[0_18px_44px_rgba(20,20,20,0.05)]">
+        <h2 className="text-2xl font-semibold tracking-tight">Quote requests</h2>
+        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+          {events.length ? (
+            events.map((event) => {
+              const eventQuotes = quoteRequests.filter(
+                (quote) => quote.event_id === event.id,
+              );
+
+              return (
+                <article key={event.id} className="rounded-lg border border-neutral-200 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-neutral-950">{event.title}</p>
+                      <p className="mt-1 text-sm text-neutral-500">
+                        {eventQuotes.length} quote request
+                        {eventQuotes.length === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                    <Link
+                      href={`/events/${event.id}`}
+                      className="text-sm font-semibold text-[#c33d38]"
+                    >
+                      Open
+                    </Link>
+                  </div>
+                  <div className="mt-4 space-y-2">
+                    {eventQuotes.length ? (
+                      eventQuotes.map((quote) => (
+                        <div
+                          key={quote.id}
+                          className="flex items-center justify-between rounded-lg bg-[#f7f7f5] px-3 py-2 text-sm"
+                        >
+                          <span className="font-semibold text-neutral-700">
+                            {quote.status}
+                          </span>
+                          <span className="text-neutral-600">
+                            $
+                            {Number(
+                              quote.vendor_final_price ?? quote.estimated_price ?? 0,
+                            ).toLocaleString()}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="rounded-lg border border-dashed border-neutral-300 p-4 text-sm text-neutral-600">
+                        No quote requests sent for this event yet.
+                      </p>
+                    )}
+                  </div>
+                </article>
+              );
+            })
+          ) : (
+            <p className="rounded-lg border border-dashed border-neutral-300 p-5 text-sm text-neutral-600">
+              Create an event and request quotes to see planner status tracking.
+            </p>
+          )}
+        </div>
+      </section>
     </div>
   );
 }

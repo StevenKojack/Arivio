@@ -2,9 +2,14 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
 
 export function hasSupabaseConfig() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
   return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    supabaseUrl &&
+      supabaseAnonKey &&
+      supabaseUrl !== "PROJECT_URL_HERE" &&
+      supabaseUrl.startsWith("https://"),
   );
 }
 

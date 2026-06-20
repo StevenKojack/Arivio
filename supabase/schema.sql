@@ -3,7 +3,7 @@ create extension if not exists "pgcrypto";
 create type public.user_role as enum ('planner', 'vendor', 'admin');
 create type public.approval_status as enum ('pending', 'approved', 'rejected', 'suspended');
 create type public.event_status as enum ('draft', 'planning', 'quote_requested', 'booked', 'completed', 'cancelled');
-create type public.quote_status as enum ('draft', 'sent', 'accepted', 'declined', 'countered', 'expired');
+create type public.quote_status as enum ('pending', 'draft', 'sent', 'accepted', 'declined', 'countered', 'expired');
 create type public.booking_status as enum ('pending', 'confirmed', 'cancelled', 'completed');
 create type public.payment_status as enum ('not_started', 'deposit_due', 'deposit_paid', 'paid', 'refunded');
 create type public.cart_item_status as enum ('draft', 'quote_requested', 'removed');
@@ -137,7 +137,7 @@ create table public.quote_requests (
   message text,
   estimated_price numeric(12, 2),
   vendor_final_price numeric(12, 2),
-  status public.quote_status not null default 'draft',
+  status public.quote_status not null default 'pending',
   created_at timestamptz not null default now()
 );
 
