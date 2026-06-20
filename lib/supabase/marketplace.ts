@@ -82,7 +82,9 @@ export async function getVendorServices(
 }
 
 export async function getMarketplaceProviders(supabase: TypedSupabaseClient) {
-  const vendors = await getApprovedVendorBusinesses(supabase);
+  const vendors = (await getApprovedVendorBusinesses(supabase)).filter(
+    (vendor) => !vendor.vacation_mode,
+  );
   const vendorIds = vendors.map((vendor) => vendor.id);
 
   if (!vendorIds.length) {

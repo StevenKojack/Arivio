@@ -90,6 +90,7 @@ export type Database = {
           phone: string | null;
           service_area_city: string | null;
           service_radius_miles: number;
+          vacation_mode: boolean;
           website_url: string | null;
         };
         Insert: Partial<Database["public"]["Tables"]["vendor_businesses"]["Row"]> & {
@@ -130,6 +131,7 @@ export type Database = {
           id: string;
           image_url: string;
           sort_order: number;
+          storage_path: string | null;
           vendor_id: string;
         };
         Insert: Partial<Database["public"]["Tables"]["vendor_photos"]["Row"]> & {

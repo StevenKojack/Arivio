@@ -30,6 +30,11 @@ export type VendorServiceCreateInput = {
   vendorId: string;
 };
 
+export type VendorPhotoUploadResult = {
+  photo: VendorPhotoRow;
+  publicUrl: string;
+};
+
 export async function createVendorBusiness(
   supabase: ArivioSupabaseClient,
   input: VendorBusinessCreateInput,
@@ -82,6 +87,27 @@ export async function updateVendorBusiness(
       service_radius_miles: input.radius,
       website_url: input.websiteUrl ?? null,
     })
+    .eq("id", input.id)
+    .select("*")
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+export async function updateVendorVacationMode(
+  supabase: ArivioSupabaseClient,
+  input: {
+    id: string;
+    vacationMode: boolean;
+  },
+) {
+  const { data, error } = await supabase
+    .from("vendor_businesses")
+    .update({ vacation_mode: input.vacationMode })
     .eq("id", input.id)
     .select("*")
     .single();
@@ -172,6 +198,20 @@ export async function updateVendorService(
   return data;
 }
 
+export async function deleteVendorService(
+  supabase: ArivioSupabaseClient,
+  serviceId: string,
+) {
+  const { error } = await supabase
+    .from("vendor_services")
+    .delete()
+    .eq("id", serviceId);
+
+  if (error) {
+    throw error;
+  }
+}
+
 export async function getVendorServicesByVendorIds(
   supabase: ArivioSupabaseClient,
   vendorIds: string[],
@@ -241,6 +281,20 @@ export async function createAvailabilityWindow(
   return data;
 }
 
+export async function deleteAvailabilityWindow(
+  supabase: ArivioSupabaseClient,
+  availabilityId: string,
+) {
+  const { error } = await supabase
+    .from("vendor_availability")
+    .delete()
+    .eq("id", availabilityId);
+
+  if (error) {
+    throw error;
+  }
+}
+
 export async function getVendorPhotosByVendorIds(
   supabase: ArivioSupabaseClient,
   vendorIds: string[],
@@ -260,6 +314,74 @@ export async function getVendorPhotosByVendorIds(
   }
 
   return data ?? [];
+}
+
+export async function uploadVendorPhoto(
+  supabase: ArivioSupabaseClient,
+  input: {
+    file: File;
+    sortOrder: number;
+    vendorId: string;
+  },
+): Promise<VendorPhotoUploadResult> {
+  const extension = input.file.name.split(".").pop()?.toLowerCase() ?? "jpg";
+  const storagePath = `${input.vendorId}/${crypto.randomUUID()}.${extension}`;
+  const { error: uploadError } = await supabase.storage
+    .from("vendor-photos")
+    .upload(storagePath, input.file, {
+      cacheControl: "3600",
+      upsert: false,
+    });
+
+  if (uploadError) {
+    throw uploadError;
+  }
+
+  const { data: publicUrlData } = supabase.storage
+    .from("vendor-photos")
+    .getPublicUrl(storagePath);
+  const publicUrl = publicUrlData.publicUrl;
+  const { data, error } = await supabase
+    .from("vendor_photos")
+    .insert({
+      image_url: publicUrl,
+      sort_order: input.sortOrder,
+      storage_path: storagePath,
+      vendor_id: input.vendorId,
+    })
+    .select("*")
+    .single();
+
+  if (error) {
+    await supabase.storage.from("vendor-photos").remove([storagePath]);
+    throw error;
+  }
+
+  return { photo: data, publicUrl };
+}
+
+export async function deleteVendorPhoto(
+  supabase: ArivioSupabaseClient,
+  photo: VendorPhotoRow,
+) {
+  if (photo.storage_path) {
+    const { error: storageError } = await supabase.storage
+      .from("vendor-photos")
+      .remove([photo.storage_path]);
+
+    if (storageError) {
+      throw storageError;
+    }
+  }
+
+  const { error } = await supabase
+    .from("vendor_photos")
+    .delete()
+    .eq("id", photo.id);
+
+  if (error) {
+    throw error;
+  }
 }
 
 export type VendorBusinessRow = PublicTableRow<"vendor_businesses">;

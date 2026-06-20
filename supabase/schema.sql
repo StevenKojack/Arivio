@@ -54,6 +54,7 @@ create table public.vendor_businesses (
   latitude double precision,
   longitude double precision,
   approval_status public.approval_status not null default 'pending',
+  vacation_mode boolean not null default false,
   website_url text,
   phone text,
   email text,
@@ -80,6 +81,7 @@ create table public.vendor_photos (
   id uuid primary key default gen_random_uuid(),
   vendor_id uuid not null references public.vendor_businesses(id) on delete cascade,
   image_url text not null,
+  storage_path text,
   sort_order integer not null default 0
 );
 

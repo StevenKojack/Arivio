@@ -29,6 +29,7 @@ export type ServiceName =
   | "Printed Programs"
   | "Live Streaming"
   | "Transportation"
+  | "Security"
   | "Staffing"
   | "Booth Rentals";
 
@@ -157,6 +158,7 @@ export const allServices: ServiceName[] = [
   "Printed Programs",
   "Live Streaming",
   "Transportation",
+  "Security",
   "Staffing",
   "Booth Rentals",
 ];
@@ -210,7 +212,7 @@ export const eventPlanPresets: Record<EventType, EventPlanPreset> = {
       "Photography",
       "Staffing",
     ],
-    more: ["Live Music", "DJ", "Photo Booth", "Transportation", "Registration"],
+    more: ["Live Music", "DJ", "Photo Booth", "Transportation", "Registration", "Security"],
   },
   Seminar: {
     recommended: [
@@ -231,7 +233,7 @@ export const eventPlanPresets: Record<EventType, EventPlanPreset> = {
       "Staffing",
       "Catering",
     ],
-    more: ["Photography", "Transportation", "DJ", "Live Music", "Printed Materials"],
+    more: ["Photography", "Transportation", "DJ", "Live Music", "Printed Materials", "Security"],
   },
   Funeral: {
     recommended: [
@@ -265,7 +267,7 @@ export const eventPlanPresets: Record<EventType, EventPlanPreset> = {
       "Live Music",
       "Staffing",
     ],
-    more: ["DJ", "Photography", "Florals", "Registration", "Printed Materials"],
+    more: ["DJ", "Photography", "Florals", "Registration", "Printed Materials", "Security"],
   },
   "Private Party": {
     recommended: [
