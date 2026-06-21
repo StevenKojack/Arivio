@@ -1,82 +1,91 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   allServices,
   getHoursBetween,
-  homeAreas,
-  marketplaceItems,
-  quoteItem,
-  type MarketplaceItem,
-  type QuoteContext,
   type ServiceName,
 } from "../data/marketplace";
-import {
-  groupRankedItems,
-  rankMarketplaceItems,
-  type RankedMarketplaceItem,
-} from "@/lib/event-intelligence/recommendations";
 import {
   recognizeEventIntent,
   searchEventIntents,
 } from "@/lib/event-intelligence/search";
-import { createBrowserSupabaseClient, hasSupabaseConfig } from "@/lib/supabase/client";
-import { getMarketplaceProviders } from "@/lib/repositories/marketplaceRepository";
+import { AddressAutocomplete, type AddressSuggestion } from "./components/AddressAutocomplete";
 import { CalendarPicker } from "./components/CalendarPicker";
 import { ServiceRecommendationCard } from "./components/ServiceRecommendationCard";
 import { StepCard } from "./components/StepCard";
 import { TimeDurationPicker } from "./components/TimeDurationPicker";
 
-type LocationChoice = "home" | "need_venue" | "have_venue" | "not_sure";
+type LocationKind =
+  | "Home"
+  | "Venue needed"
+  | "Already have venue"
+  | "Ceremony"
+  | "Reception"
+  | "Church"
+  | "Banquet hall"
+  | "Afterparty"
+  | "Other";
 
-const steps = [
-  "What",
-  "Confirm",
-  "When",
-  "Where",
-  "Guests",
-  "Recommendations",
-] as const;
+type EventLocation = {
+  id: number;
+  kind: LocationKind;
+  query: string;
+  selectedAddress: string;
+  selectedLabel: string;
+};
 
-const locationOptions: Array<{
-  body: string;
-  id: LocationChoice;
+type PlanAddition = {
+  id: string;
+  kind: "Culture/style" | "Service" | "Venue style" | "Note";
   label: string;
-}> = [
-  { body: "Use your address as the event location.", id: "home", label: "My home" },
-  { body: "Start with venue matches before vendors.", id: "need_venue", label: "I need a venue" },
-  { body: "Use a known location for vendor distance and availability.", id: "have_venue", label: "I already have a venue" },
-  { body: "Keep location flexible for now.", id: "not_sure", label: "Not sure yet" },
-];
+  service?: ServiceName;
+};
 
-function demoItems() {
-  return marketplaceItems.map((item) => ({ ...item, databaseSource: false }));
-}
+const steps = ["What", "Confirm", "When", "Where", "Guests", "Review"] as const;
+
+const locationKinds: LocationKind[] = [
+  "Home",
+  "Venue needed",
+  "Already have venue",
+  "Ceremony",
+  "Reception",
+  "Church",
+  "Banquet hall",
+  "Afterparty",
+  "Other",
+];
 
 export function EventWizard() {
   const searchParams = useSearchParams();
   const initialQuery = searchParams.get("query") ?? "";
   const [step, setStep] = useState(initialQuery ? 1 : 0);
   const [query, setQuery] = useState(initialQuery);
-  const [providers, setProviders] = useState<MarketplaceItem[]>(demoItems);
-  const [providerMessage, setProviderMessage] = useState("Loading provider matches...");
   const [timing, setTiming] = useState({
     date: "",
-    endTime: "22:00",
     endDate: "",
+    endTime: "22:00",
     setupTime: "17:00",
     startTime: "18:00",
     teardownTime: "23:00",
   });
   const [showAdvancedTiming, setShowAdvancedTiming] = useState(false);
   const [isMultiDay, setIsMultiDay] = useState(false);
-  const [locationChoice, setLocationChoice] = useState<LocationChoice>("not_sure");
-  const [locationDetail, setLocationDetail] = useState("");
+  const [locations, setLocations] = useState<EventLocation[]>([
+    {
+      id: 1,
+      kind: "Venue needed",
+      query: "",
+      selectedAddress: "",
+      selectedLabel: "",
+    },
+  ]);
   const [guestCount, setGuestCount] = useState(60);
   const [budget, setBudget] = useState(6000);
   const [customNote, setCustomNote] = useState("");
+  const [planAdditions, setPlanAdditions] = useState<PlanAddition[]>([]);
   const [selectedServices, setSelectedServices] = useState<ServiceName[]>(
     () => recognizeEventIntent(initialQuery || "Private party").recommendedServices,
   );
@@ -85,108 +94,47 @@ export function EventWizard() {
     [query],
   );
   const suggestions = useMemo(() => searchEventIntents(query, 5), [query]);
-  const relevantServices = useMemo(
-    () =>
-      uniqueServices([
-        ...recognition.profile.requiredVendors,
-        ...recognition.profile.recommendedVendors,
-        ...recognition.profile.optionalVendors,
-        ...recognition.profile.luxuryAddOns,
-      ]).filter((service) => !recognition.excludedServices.includes(service)),
-    [recognition],
+  const visibleServices = selectedServices.filter(
+    (service) => !recognition.excludedServices.includes(service),
   );
-  const quoteContext = useMemo<QuoteContext>(
-    () => ({
-      date: timing.date,
-      durationHours: getHoursBetween(timing.startTime, timing.endTime),
-      endTime: timing.endTime,
-      guests: guestCount,
-      startTime: timing.startTime,
-    }),
-    [guestCount, timing.date, timing.endTime, timing.startTime],
-  );
-  const rankedItems = useMemo(
-    () =>
-      rankMarketplaceItems(
-        providers.filter(
-          (item) =>
-            selectedServices.length === 0 ||
-            item.services.some((service) => selectedServices.includes(service)) ||
-            selectedServices.includes(item.type),
-        ),
-        recognition,
-        {
-          coordinates: homeAreas[0].coordinates,
-          quoteContext,
-        },
-      ),
-    [providers, quoteContext, recognition, selectedServices],
-  );
-  const groupedItems = groupRankedItems(rankedItems);
+  const locationSummary = getLocationSummary(locations);
+  const durationHours = getHoursBetween(timing.startTime, timing.endTime);
   const marketplaceHref = useMemo(() => {
     const profile = recognition.profile;
     const params = new URLSearchParams({
       budget: String(budget),
       date: timing.date,
-      duration: String(quoteContext.durationHours),
+      duration: String(durationHours),
       event: profile.marketplaceEventType ?? "Private Party",
       guests: String(guestCount),
-      services: selectedServices.join(","),
+      location: locationSummary,
+      services: visibleServices.join(","),
       time: timing.startTime,
     });
 
-    if (locationDetail) {
-      params.set("location", locationDetail);
+    if (planAdditions.length) {
+      params.set("notes", planAdditions.map((addition) => addition.label).join(", "));
     }
 
     return `/marketplace?${params.toString()}`;
   }, [
     budget,
+    durationHours,
     guestCount,
-    locationDetail,
-    quoteContext.durationHours,
+    locationSummary,
+    planAdditions,
     recognition.profile,
-    selectedServices,
     timing.date,
     timing.startTime,
+    visibleServices,
   ]);
   const canOpenMarketplace =
     Boolean(timing.date && timing.startTime && timing.endTime) &&
     guestCount > 0 &&
-    locationChoice !== "not_sure";
-
-  useEffect(() => {
-    async function loadProviders() {
-      if (!hasSupabaseConfig()) {
-        setProviders(demoItems());
-        setProviderMessage("Showing demo providers until Supabase has approved vendors.");
-        return;
-      }
-
-      try {
-        const supabase = createBrowserSupabaseClient();
-        const databaseProviders = await getMarketplaceProviders(supabase);
-
-        if (databaseProviders.length) {
-          setProviders(databaseProviders);
-          setProviderMessage("Showing approved database providers ranked by event fit.");
-          return;
-        }
-
-        setProviders(demoItems());
-        setProviderMessage("No approved database providers found yet. Showing demo providers.");
-      } catch (error) {
-        setProviders(demoItems());
-        setProviderMessage(
-          error instanceof Error
-            ? `${error.message}. Showing demo providers.`
-            : "Unable to load database providers. Showing demo providers.",
-        );
-      }
-    }
-
-    loadProviders();
-  }, []);
+    locations.some((location) =>
+      location.kind === "Venue needed" ||
+      Boolean(location.query.trim() || location.selectedAddress),
+    );
 
   function continueFromSearch(nextQuery = query) {
     const cleanQuery = nextQuery.trim();
@@ -208,22 +156,113 @@ export function EventWizard() {
     );
   }
 
+  function addService(service: ServiceName) {
+    setSelectedServices((current) =>
+      current.includes(service) ? current : [...current, service],
+    );
+  }
+
+  function addCustomNoteToPlan() {
+    const additions = parsePlanAdditions(customNote);
+    const nextAdditions: PlanAddition[] =
+      additions.length > 0
+        ? additions
+        : [
+            {
+              id: `note-${normalizeId(customNote)}`,
+              kind: "Note" as const,
+              label: customNote.trim(),
+            },
+          ].filter((addition) => addition.label);
+
+    if (!nextAdditions.length) {
+      return;
+    }
+
+    setPlanAdditions((current) => mergeAdditions(current, nextAdditions));
+    nextAdditions.forEach((addition) => {
+      if (addition.service) {
+        addService(addition.service);
+      }
+    });
+    setCustomNote("");
+  }
+
+  function removePlanAddition(addition: PlanAddition) {
+    setPlanAdditions((current) => current.filter((item) => item.id !== addition.id));
+
+    if (addition.service && !recognition.recommendedServices.includes(addition.service)) {
+      setSelectedServices((current) =>
+        current.filter((service) => service !== addition.service),
+      );
+    }
+  }
+
+  function updateLocation(id: number, updates: Partial<EventLocation>) {
+    setLocations((current) =>
+      current.map((location) =>
+        location.id === id ? { ...location, ...updates } : location,
+      ),
+    );
+  }
+
+  function addLocation() {
+    setLocations((current) => [
+      ...current,
+      {
+        id: Date.now(),
+        kind: "Reception",
+        query: "",
+        selectedAddress: "",
+        selectedLabel: "",
+      },
+    ]);
+  }
+
+  function removeLocation(id: number) {
+    setLocations((current) => current.filter((location) => location.id !== id));
+  }
+
+  function canVisitStep(index: number) {
+    if (index <= step) {
+      return true;
+    }
+
+    if (index === 1 || index === 2) {
+      return Boolean(query.trim());
+    }
+
+    if (index === 3) {
+      return Boolean(query.trim() && timing.date);
+    }
+
+    if (index === 4) {
+      return Boolean(query.trim() && timing.date);
+    }
+
+    return canOpenMarketplace || Boolean(query.trim() && timing.date && guestCount > 0);
+  }
+
   return (
     <section className="px-6 py-10 sm:px-8 lg:px-12">
       <div className="mx-auto max-w-5xl">
-        <StepRail currentStep={step} />
-        <div className="mt-8 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-[0_28px_90px_rgba(20,20,20,0.08)]">
+        <StepRail
+          canVisitStep={canVisitStep}
+          currentStep={step}
+          onStepChange={setStep}
+        />
+        <div className="mt-8 overflow-hidden rounded-[34px] border border-neutral-200 bg-white shadow-[0_28px_90px_rgba(20,20,20,0.08)]">
           {step === 0 ? (
             <StepCard
               eyebrow="Step 1"
               title="What are you planning?"
-              body="Type the event naturally. Arivio will infer the profile in the background."
+              body="Type the event naturally. Arivio will quietly shape the plan around it."
               action={
                 <button
                   type="button"
                   onClick={() => continueFromSearch()}
                   disabled={!query.trim()}
-                  className="h-12 rounded-full bg-neutral-950 px-6 text-sm font-semibold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="h-12 rounded-full bg-neutral-950 px-6 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Continue
                 </button>
@@ -246,16 +285,15 @@ export function EventWizard() {
               action={<PrimaryButton label="Looks right" onClick={() => setStep(2)} />}
             >
               <UnderstandingCard
+                additions={planAdditions}
                 customNote={customNote}
-                onCustomNoteChange={setCustomNote}
                 recognition={recognition}
                 selectedServices={selectedServices}
+                onAddCustomNote={addCustomNoteToPlan}
+                onAddService={addService}
+                onCustomNoteChange={setCustomNote}
+                onRemoveAddition={removePlanAddition}
                 onToggleService={toggleService}
-                onAddService={(service) =>
-                  setSelectedServices((current) =>
-                    current.includes(service) ? current : [...current, service],
-                  )
-                }
               />
             </StepCard>
           ) : null}
@@ -264,7 +302,7 @@ export function EventWizard() {
             <StepCard
               eyebrow="Step 3"
               title="When is it?"
-              body="Date and time drive availability, pricing, and vendor fit."
+              body="Date and time help Arivio estimate availability and pricing without asking for too much."
               action={<PrimaryButton label="Continue" onClick={() => setStep(3)} />}
             >
               <div className="grid gap-5">
@@ -287,7 +325,7 @@ export function EventWizard() {
               <button
                 type="button"
                 onClick={() => setShowAdvancedTiming((current) => !current)}
-                className="mt-5 rounded-full border border-neutral-200 px-4 py-2 text-sm font-semibold text-neutral-700 transition hover:border-neutral-950"
+                className="mt-5 rounded-full border border-neutral-200 px-4 py-2 text-sm font-semibold text-neutral-700 transition hover:-translate-y-0.5 hover:border-neutral-950"
               >
                 {showAdvancedTiming ? "Hide advanced timing" : "Advanced timing"}
               </button>
@@ -336,70 +374,59 @@ export function EventWizard() {
             <StepCard
               eyebrow="Step 4"
               title="Where is it?"
-              body="Location keeps venue and vendor recommendations realistic."
+              body="Add one location now, or separate places like ceremony and reception if the event needs them."
               action={<PrimaryButton label="Continue" onClick={() => setStep(4)} />}
             >
-              <div className="grid gap-3 md:grid-cols-2">
-                {locationOptions.map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => setLocationChoice(option.id)}
-                    className={`rounded-lg border p-4 text-left transition ${
-                      locationChoice === option.id
-                        ? "border-neutral-950 bg-neutral-950 text-white"
-                        : "border-neutral-200 bg-[#fbfbfa] text-neutral-950 hover:border-neutral-400"
-                    }`}
-                  >
-                    <span className="block text-base font-semibold">{option.label}</span>
-                    <span
-                      className={`mt-2 block text-sm leading-6 ${
-                        locationChoice === option.id ? "text-neutral-300" : "text-neutral-600"
-                      }`}
-                    >
-                      {option.body}
-                    </span>
-                  </button>
+              <div className="space-y-4">
+                {locations.map((location, index) => (
+                  <LocationCard
+                    key={location.id}
+                    index={index}
+                    location={location}
+                    canRemove={locations.length > 1}
+                    onRemove={() => removeLocation(location.id)}
+                    onSelectAddress={(suggestion) =>
+                      updateLocation(location.id, {
+                        query: suggestion.label,
+                        selectedAddress: suggestion.address,
+                        selectedLabel: suggestion.label,
+                      })
+                    }
+                    onUpdate={(updates) => updateLocation(location.id, updates)}
+                  />
                 ))}
+                <button
+                  type="button"
+                  onClick={addLocation}
+                  className="h-12 rounded-full border border-neutral-300 bg-white px-5 text-sm font-semibold text-neutral-950 transition hover:-translate-y-0.5 hover:border-neutral-950"
+                >
+                  Add another location
+                </button>
               </div>
-              {locationChoice !== "not_sure" ? (
-                <input
-                  value={locationDetail}
-                  onChange={(event) => setLocationDetail(event.target.value)}
-                  placeholder={
-                    locationChoice === "home"
-                      ? "Home address"
-                      : locationChoice === "have_venue"
-                        ? "Venue name or address"
-                        : "Preferred city or neighborhood"
-                  }
-                  className="mt-5 h-12 w-full rounded-lg border border-neutral-300 px-4 text-sm font-semibold outline-none transition focus:border-neutral-950"
-                />
-              ) : null}
             </StepCard>
           ) : null}
 
           {step === 4 ? (
             <StepCard
               eyebrow="Step 5"
-              title="Guest count and budget."
-              body="This helps Arivio avoid vendors that are too small, too large, or badly priced."
-              action={<PrimaryButton label="Build recommendations" onClick={() => setStep(5)} />}
+              title="Guests and budget."
+              body="A simple range is enough. Arivio will use it to keep matches realistic."
+              action={<PrimaryButton label="Review plan" onClick={() => setStep(5)} />}
             >
               <div className="grid gap-5">
                 <div className="grid gap-4 md:grid-cols-2">
-                <TimingField
-                  label="Guest count"
-                  type="number"
-                  value={String(guestCount)}
-                  onChange={(value) => setGuestCount(Number(value))}
-                />
-                <TimingField
-                  label="Estimated budget"
-                  type="number"
-                  value={String(budget)}
-                  onChange={(value) => setBudget(Number(value))}
-                />
+                  <TimingField
+                    label="Guest count"
+                    type="number"
+                    value={String(guestCount)}
+                    onChange={(value) => setGuestCount(Number(value))}
+                  />
+                  <TimingField
+                    label="Estimated budget"
+                    type="number"
+                    value={String(budget)}
+                    onChange={(value) => setBudget(Number(value))}
+                  />
                 </div>
                 <div className="grid gap-2 sm:grid-cols-4">
                   {[
@@ -412,7 +439,7 @@ export function EventWizard() {
                       key={label}
                       type="button"
                       onClick={() => setBudget(Number(value))}
-                      className={`h-12 rounded-full border text-sm font-semibold transition ${
+                      className={`h-12 rounded-full border text-sm font-semibold transition hover:-translate-y-0.5 ${
                         budget === Number(value)
                           ? "border-neutral-950 bg-neutral-950 text-white"
                           : "border-neutral-200 bg-white text-neutral-700 hover:border-neutral-950"
@@ -438,58 +465,45 @@ export function EventWizard() {
           {step === 5 ? (
             <StepCard
               eyebrow="Step 6"
-              title="Smart recommendations."
-              body={providerMessage}
+              title="Your plan is ready."
+              body="Browse matches when you are ready. You can still edit the details before vendors appear."
               action={
-                canOpenMarketplace ? (
-                  <Link
-                    href={marketplaceHref}
-                    className="inline-flex h-12 items-center justify-center rounded-full bg-neutral-950 px-6 text-sm font-semibold text-white transition hover:bg-neutral-800"
-                  >
-                    Continue to marketplace
-                  </Link>
-                ) : (
+                <div className="flex flex-wrap gap-3">
+                  {canOpenMarketplace ? (
+                    <Link
+                      href={marketplaceHref}
+                      className="inline-flex h-12 items-center justify-center rounded-full bg-neutral-950 px-6 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-neutral-800"
+                    >
+                      Browse matches
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled
+                      className="h-12 rounded-full bg-neutral-950 px-6 text-sm font-semibold text-white opacity-40"
+                    >
+                      Add date and location first
+                    </button>
+                  )}
                   <button
                     type="button"
-                    disabled
-                    className="h-12 rounded-full bg-neutral-950 px-6 text-sm font-semibold text-white opacity-40"
+                    onClick={() => setStep(1)}
+                    className="h-12 rounded-full border border-neutral-300 bg-white px-6 text-sm font-semibold text-neutral-950 transition hover:-translate-y-0.5 hover:border-neutral-950"
                   >
-                    Add date and location first
+                    Edit details
                   </button>
-                )
+                </div>
               }
             >
-              <ServiceControl
-                relevantServices={relevantServices}
-                selectedServices={selectedServices}
-                onToggle={toggleService}
+              <FinalReview
+                additions={planAdditions}
+                budget={budget}
+                guestCount={guestCount}
+                locations={locations}
+                recognition={recognition}
+                selectedServices={visibleServices}
+                timing={timing}
               />
-              <div className="mt-6 grid gap-5">
-                <RecommendationGroup
-                  title="Required"
-                  description="The plan likely needs these to function."
-                  items={groupedItems.required}
-                  quoteContext={quoteContext}
-                />
-                <RecommendationGroup
-                  title="Recommended"
-                  description="Strong fit for the event experience."
-                  items={groupedItems.recommended}
-                  quoteContext={quoteContext}
-                />
-                <RecommendationGroup
-                  title="Optional"
-                  description="Useful depending on taste, program, and location."
-                  items={groupedItems.optional}
-                  quoteContext={quoteContext}
-                />
-                <RecommendationGroup
-                  title="Luxury add-ons"
-                  description="Elevated touches when the budget allows."
-                  items={groupedItems.luxury}
-                  quoteContext={quoteContext}
-                />
-              </div>
             </StepCard>
           ) : null}
         </div>
@@ -508,24 +522,41 @@ export function EventWizard() {
   );
 }
 
-function StepRail({ currentStep }: { currentStep: number }) {
+function StepRail({
+  canVisitStep,
+  currentStep,
+  onStepChange,
+}: {
+  canVisitStep: (index: number) => boolean;
+  currentStep: number;
+  onStepChange: (index: number) => void;
+}) {
   return (
     <div className="flex gap-2 overflow-x-auto pb-1">
-      {steps.map((label, index) => (
-        <div
-          key={label}
-          className={`flex min-w-fit items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold ${
-            currentStep === index
-              ? "border-neutral-950 bg-neutral-950 text-white"
-              : currentStep > index
-                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                : "border-neutral-200 bg-white text-neutral-500"
-          }`}
-        >
-          <span>{index + 1}</span>
-          <span>{label}</span>
-        </div>
-      ))}
+      {steps.map((label, index) => {
+        const isAvailable = canVisitStep(index);
+
+        return (
+          <button
+            key={label}
+            type="button"
+            disabled={!isAvailable}
+            onClick={() => onStepChange(index)}
+            className={`flex min-w-fit items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition ${
+              currentStep === index
+                ? "border-neutral-950 bg-neutral-950 text-white shadow-[0_14px_34px_rgba(20,20,20,0.16)]"
+                : currentStep > index
+                  ? "border-neutral-200 bg-white text-neutral-800 hover:-translate-y-0.5 hover:border-neutral-950"
+                  : isAvailable
+                    ? "border-neutral-200 bg-white text-neutral-500 hover:border-neutral-400"
+                    : "cursor-not-allowed border-neutral-200 bg-neutral-50 text-neutral-300"
+            }`}
+          >
+            <span>{index + 1}</span>
+            <span>{label}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -576,41 +607,23 @@ function SearchBox({
   );
 }
 
-function PlainDetail({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl bg-white p-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-neutral-400">
-        {label}
-      </p>
-      <p className="mt-1 text-sm font-semibold capitalize text-neutral-950">{value}</p>
-    </div>
-  );
-}
-
-function ReadonlyInput({ label, value }: { label: string; value: string }) {
-  return (
-    <label className="text-sm font-semibold text-neutral-800">
-      {label}
-      <input
-        value={value}
-        readOnly
-        className="mt-2 h-12 w-full rounded-2xl border border-neutral-200 bg-[#fbfbfa] px-4 text-sm font-semibold text-neutral-700"
-      />
-    </label>
-  );
-}
-
 function UnderstandingCard({
+  additions,
   customNote,
-  onCustomNoteChange,
+  onAddCustomNote,
   onAddService,
+  onCustomNoteChange,
+  onRemoveAddition,
   onToggleService,
   recognition,
   selectedServices,
 }: {
+  additions: PlanAddition[];
   customNote: string;
+  onAddCustomNote: () => void;
   onAddService: (service: ServiceName) => void;
   onCustomNoteChange: (value: string) => void;
+  onRemoveAddition: (addition: PlanAddition) => void;
   onToggleService: (service: ServiceName) => void;
   recognition: ReturnType<typeof recognizeEventIntent>;
   selectedServices: ServiceName[];
@@ -631,8 +644,10 @@ function UnderstandingCard({
 
   return (
     <div className="space-y-5">
-      <div className="rounded-[28px] border border-neutral-200 bg-[#fbfbfa] p-5">
-        <p className="text-sm font-semibold text-neutral-500">You are planning</p>
+      <div className="rounded-[30px] border border-neutral-200 bg-[linear-gradient(135deg,#fbfbfa,#ffffff)] p-5">
+        <p className="text-sm font-semibold text-neutral-500">
+          Looks like you are planning
+        </p>
         <h2 className="mt-2 text-3xl font-semibold tracking-tight text-neutral-950">
           {recognition.preservedSubtype ?? profile.subtype ?? profile.primaryType}
         </h2>
@@ -647,20 +662,20 @@ function UnderstandingCard({
         </div>
       </div>
 
-      <div className="rounded-[28px] border border-neutral-200 p-5">
+      <div className="rounded-[30px] border border-neutral-200 p-5">
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-sm font-semibold text-neutral-950">
-              We will help you find
+              We will start with
             </p>
             <p className="mt-1 text-sm text-neutral-600">
-              Remove anything you do not need.
+              Add or remove only what matters now.
             </p>
           </div>
           <button
             type="button"
             onClick={() => setIsEditing((current) => !current)}
-            className="rounded-full border border-neutral-200 px-4 py-2 text-sm font-semibold text-neutral-700 transition hover:border-neutral-950"
+            className="rounded-full border border-neutral-200 px-4 py-2 text-sm font-semibold text-neutral-700 transition hover:-translate-y-0.5 hover:border-neutral-950"
           >
             {isEditing ? "Done" : "Edit details"}
           </button>
@@ -678,18 +693,8 @@ function UnderstandingCard({
       </div>
 
       {isEditing ? (
-        <div className="rounded-[28px] border border-neutral-200 bg-white p-5 shadow-[0_18px_50px_rgba(20,20,20,0.06)]">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <ReadonlyInput label="Event type" value={profile.primaryType} />
-            <ReadonlyInput
-              label="Subtype"
-              value={recognition.preservedSubtype ?? profile.subtype ?? "General"}
-            />
-            <ReadonlyInput label="Culture or style" value={profile.culture ?? "Flexible"} />
-            <ReadonlyInput label="Indoor or outdoor" value={profile.indoorOutdoor} />
-            <ReadonlyInput label="Vibe" value={profile.likelyVibe ?? "Flexible"} />
-          </div>
-          <label className="mt-5 block text-sm font-semibold text-neutral-800">
+        <div className="rounded-[30px] border border-neutral-200 bg-white p-5 shadow-[0_18px_50px_rgba(20,20,20,0.06)]">
+          <label className="block text-sm font-semibold text-neutral-800">
             Add a service
             <input
               value={serviceSearch}
@@ -711,15 +716,202 @@ function UnderstandingCard({
         </div>
       ) : null}
 
-      <label className="block text-sm font-semibold text-neutral-800">
-        Want to add anything?
-        <input
-          value={customNote}
-          onChange={(event) => onCustomNoteChange(event.target.value)}
-          placeholder="Theme, cultural needs, accessibility, food style..."
-          className="mt-2 h-12 w-full rounded-lg border border-neutral-300 px-4 text-sm font-semibold outline-none transition focus:border-neutral-950"
-        />
-      </label>
+      <div className="rounded-[30px] border border-neutral-200 bg-[#fbfbfa] p-5">
+        <label className="block text-sm font-semibold text-neutral-800">
+          Want to add anything?
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+            <input
+              value={customNote}
+              onChange={(event) => onCustomNoteChange(event.target.value)}
+              placeholder="Armenian DJ, banquet hall, catering..."
+              className="h-12 flex-1 rounded-2xl border border-neutral-300 bg-white px-4 text-sm font-semibold outline-none transition focus:border-neutral-950"
+            />
+            <button
+              type="button"
+              onClick={onAddCustomNote}
+              disabled={!customNote.trim()}
+              className="h-12 rounded-full bg-neutral-950 px-5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Add to plan
+            </button>
+          </div>
+        </label>
+        {additions.length ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {additions.map((addition) => (
+              <button
+                key={addition.id}
+                type="button"
+                onClick={() => onRemoveAddition(addition)}
+                className="rounded-full border border-neutral-200 bg-white px-3 py-2 text-xs font-semibold text-neutral-700 transition hover:-translate-y-0.5 hover:border-neutral-950"
+              >
+                {addition.kind}: {addition.label} x
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function LocationCard({
+  canRemove,
+  index,
+  location,
+  onRemove,
+  onSelectAddress,
+  onUpdate,
+}: {
+  canRemove: boolean;
+  index: number;
+  location: EventLocation;
+  onRemove: () => void;
+  onSelectAddress: (suggestion: AddressSuggestion) => void;
+  onUpdate: (updates: Partial<EventLocation>) => void;
+}) {
+  return (
+    <div className="rounded-[30px] border border-neutral-200 bg-[#fbfbfa] p-5">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-semibold text-neutral-950">
+          Location {index + 1}
+        </p>
+        {canRemove ? (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="rounded-full border border-neutral-200 bg-white px-3 py-1 text-xs font-semibold text-neutral-600 transition hover:border-neutral-950"
+          >
+            Remove
+          </button>
+        ) : null}
+      </div>
+      <div className="mt-4 grid gap-4 sm:grid-cols-[220px_1fr]">
+        <label className="text-sm font-semibold text-neutral-800">
+          Type
+          <select
+            value={location.kind}
+            onChange={(event) =>
+              onUpdate({ kind: event.target.value as LocationKind })
+            }
+            className="mt-2 h-12 w-full rounded-2xl border border-neutral-300 bg-white px-4 text-sm font-semibold outline-none transition focus:border-neutral-950"
+          >
+            {locationKinds.map((kind) => (
+              <option key={kind}>{kind}</option>
+            ))}
+          </select>
+        </label>
+        {location.kind === "Venue needed" ? (
+          <label className="text-sm font-semibold text-neutral-800">
+            Preferred area
+            <input
+              value={location.query}
+              onChange={(event) => onUpdate({ query: event.target.value })}
+              placeholder="City, neighborhood, or leave flexible"
+              className="mt-2 h-12 w-full rounded-2xl border border-neutral-300 bg-white px-4 text-sm font-semibold outline-none transition focus:border-neutral-950"
+            />
+          </label>
+        ) : (
+          <AddressAutocomplete
+            label="Address or venue"
+            value={location.query}
+            selectedAddress={location.selectedAddress}
+            onChange={(value) =>
+              onUpdate({ query: value, selectedAddress: "", selectedLabel: "" })
+            }
+            onSelect={onSelectAddress}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FinalReview({
+  additions,
+  budget,
+  guestCount,
+  locations,
+  recognition,
+  selectedServices,
+  timing,
+}: {
+  additions: PlanAddition[];
+  budget: number;
+  guestCount: number;
+  locations: EventLocation[];
+  recognition: ReturnType<typeof recognizeEventIntent>;
+  selectedServices: ServiceName[];
+  timing: {
+    date: string;
+    endTime: string;
+    startTime: string;
+  };
+}) {
+  const eventName =
+    recognition.preservedSubtype ??
+    recognition.profile.subtype ??
+    recognition.profile.primaryType;
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-[30px] border border-neutral-200 bg-[linear-gradient(135deg,#fbfbfa,#ffffff)] p-5">
+        <p className="text-sm font-semibold text-neutral-500">
+          Arivio will search for
+        </p>
+        <h2 className="mt-2 text-3xl font-semibold tracking-tight text-neutral-950">
+          {eventName}
+        </h2>
+        <p className="mt-3 text-base leading-7 text-neutral-600">
+          We will start with {toFriendlyNeeds(selectedServices)}.
+        </p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <PlainDetail label="Date" value={timing.date || "Choose date"} />
+        <PlainDetail label="Time" value={`${timing.startTime} - ${timing.endTime}`} />
+        <PlainDetail label="Guests" value={guestCount.toLocaleString()} />
+        <PlainDetail label="Budget" value={`$${budget.toLocaleString()}`} />
+      </div>
+      <div className="rounded-[30px] border border-neutral-200 bg-white p-5">
+        <p className="text-sm font-semibold text-neutral-950">Locations</p>
+        <div className="mt-3 space-y-2">
+          {locations.map((location) => (
+            <p key={location.id} className="rounded-2xl bg-[#fbfbfa] px-4 py-3 text-sm font-semibold text-neutral-700">
+              {location.kind}:{" "}
+              {location.selectedLabel ||
+                location.selectedAddress ||
+                location.query ||
+                "Flexible"}
+            </p>
+          ))}
+        </div>
+      </div>
+      {additions.length ? (
+        <div className="rounded-[30px] border border-neutral-200 bg-white p-5">
+          <p className="text-sm font-semibold text-neutral-950">Added details</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {additions.map((addition) => (
+              <span
+                key={addition.id}
+                className="rounded-full bg-[#f7f7f5] px-3 py-2 text-xs font-semibold text-neutral-700"
+              >
+                {addition.label}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function PlainDetail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-white p-4 shadow-[inset_0_0_0_1px_rgba(229,229,229,1)]">
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-neutral-400">
+        {label}
+      </p>
+      <p className="mt-1 text-sm font-semibold capitalize text-neutral-950">{value}</p>
     </div>
   );
 }
@@ -742,7 +934,7 @@ function TimingField({
         type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-2 h-12 w-full rounded-lg border border-neutral-300 px-4 text-sm font-semibold outline-none transition focus:border-neutral-950"
+        className="mt-2 h-12 w-full rounded-2xl border border-neutral-300 px-4 text-sm font-semibold outline-none transition focus:border-neutral-950"
       />
     </label>
   );
@@ -759,116 +951,111 @@ function PrimaryButton({
     <button
       type="button"
       onClick={onClick}
-      className="h-12 rounded-full bg-neutral-950 px-6 text-sm font-semibold text-white transition hover:bg-neutral-800"
+      className="h-12 rounded-full bg-neutral-950 px-6 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-neutral-800"
     >
       {label}
     </button>
   );
 }
 
-function ServiceControl({
-  onToggle,
-  relevantServices,
-  selectedServices,
-}: {
-  onToggle: (service: ServiceName) => void;
-  relevantServices: ServiceName[];
-  selectedServices: ServiceName[];
-}) {
-  return (
-    <div className="rounded-lg border border-neutral-200 bg-[#fbfbfa] p-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm font-semibold text-neutral-950">Customize your event profile</p>
-          <p className="mt-1 text-sm text-neutral-600">
-            Only relevant suggestions are shown here.
-          </p>
-        </div>
-        <p className="text-xs font-semibold text-neutral-500">
-          {selectedServices.length} selected
-        </p>
-      </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-        {relevantServices.map((service) => (
-          <button
-            key={service}
-            type="button"
-            onClick={() => onToggle(service)}
-            className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
-              selectedServices.includes(service)
-                ? "bg-neutral-950 text-white"
-                : "border border-neutral-200 bg-white text-neutral-700 hover:border-neutral-950"
-            }`}
-          >
-            {service}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
+function parsePlanAdditions(value: string): PlanAddition[] {
+  const text = value.toLowerCase();
+  const additions: PlanAddition[] = [];
+  const cultures = [
+    "armenian",
+    "mexican",
+    "persian",
+    "filipino",
+    "korean",
+    "japanese",
+    "indian",
+    "jewish",
+    "latin",
+  ];
+  const detectedCulture = cultures.find((culture) => text.includes(culture));
+
+  if (detectedCulture) {
+    additions.push({
+      id: `culture-${detectedCulture}`,
+      kind: "Culture/style",
+      label: capitalize(detectedCulture),
+    });
+  }
+
+  addServiceMatch(additions, text, ["dj", "disc jockey"], detectedCulture ? `${capitalize(detectedCulture)} DJ` : "DJ", "DJ");
+  addServiceMatch(additions, text, ["catering", "caterer", "food"], detectedCulture ? `${capitalize(detectedCulture)} catering` : "Catering", "Catering");
+  addServiceMatch(additions, text, ["security", "guard"], "Security", "Security");
+  addServiceMatch(additions, text, ["porta potties", "portable restroom", "restrooms", "bathrooms"], "Portable restrooms", "Portable Restrooms");
+  addServiceMatch(additions, text, ["photographer", "photography", "photo coverage"], "Photography", "Photography");
+  addServiceMatch(additions, text, ["live band", "live music", "band"], "Live Music", "Live Music");
+  addServiceMatch(additions, text, ["photo booth", "photobooth"], "Photo Booth", "Photo Booth");
+  addServiceMatch(additions, text, ["flowers", "florals"], "Florals", "Florals");
+  addServiceMatch(additions, text, ["cake", "dessert"], "Cake & Desserts", "Cake & Desserts");
+
+  if (text.includes("banquet hall")) {
+    additions.push({
+      id: "venue-style-banquet-hall",
+      kind: "Venue style",
+      label: "Banquet Hall",
+    });
+    additions.push({
+      id: "service-venue",
+      kind: "Service",
+      label: "Venue",
+      service: "Venue",
+    });
+  } else if (text.includes("venue") || text.includes("hall")) {
+    additions.push({
+      id: "service-venue",
+      kind: "Service",
+      label: "Venue",
+      service: "Venue",
+    });
+  }
+
+  return mergeAdditions([], additions);
 }
 
-function RecommendationGroup({
-  description,
-  items,
-  quoteContext,
-  title,
-}: {
-  description: string;
-  items: RankedMarketplaceItem[];
-  quoteContext: QuoteContext;
-  title: string;
-}) {
-  const visibleItems = items.slice(0, 3);
+function addServiceMatch(
+  additions: PlanAddition[],
+  text: string,
+  terms: string[],
+  label: string,
+  service: ServiceName,
+) {
+  if (terms.some((term) => text.includes(term))) {
+    additions.push({
+      id: `service-${normalizeId(label)}`,
+      kind: "Service",
+      label,
+      service,
+    });
+  }
+}
 
-  return (
-    <div className="rounded-lg border border-neutral-200 bg-[#fbfbfa] p-4">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h3 className="text-lg font-semibold tracking-tight text-neutral-950">
-            {title}
-          </h3>
-          <p className="mt-1 text-sm text-neutral-600">{description}</p>
-        </div>
-        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-neutral-700">
-          {items.length}
-        </span>
-      </div>
+function mergeAdditions(current: PlanAddition[], incoming: PlanAddition[]) {
+  const additions = [...current];
 
-      {visibleItems.length ? (
-        <div className="mt-4 grid gap-3 lg:grid-cols-3">
-          {visibleItems.map(({ item, match }) => (
-            <article key={`${title}-${item.id}`} className="rounded-lg border border-neutral-200 bg-white p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#e24b44]">
-                    {item.type}
-                  </p>
-                  <h4 className="mt-2 text-base font-semibold text-neutral-950">
-                    {item.name}
-                  </h4>
-                </div>
-                <span className="rounded-full bg-neutral-950 px-3 py-1 text-xs font-semibold text-white">
-                  {match.score}
-                </span>
-              </div>
-              <p className="mt-2 text-xs font-medium text-neutral-500">{item.location}</p>
-              <p className="mt-3 text-sm text-neutral-600">
-                {match.reasons.slice(0, 2).join(". ")}
-              </p>
-              <p className="mt-4 text-lg font-semibold text-neutral-950">
-                ${quoteItem(item, quoteContext).toLocaleString()}
-              </p>
-            </article>
-          ))}
-        </div>
-      ) : (
-        <p className="mt-4 rounded-lg border border-dashed border-neutral-300 bg-white p-4 text-sm font-semibold text-neutral-500">
-          No provider matches yet.
-        </p>
-      )}
-    </div>
-  );
+  incoming.forEach((addition) => {
+    if (!additions.some((item) => item.id === addition.id)) {
+      additions.push(addition);
+    }
+  });
+
+  return additions;
+}
+
+function getLocationSummary(locations: EventLocation[]) {
+  return locations
+    .map((location) => {
+      const value =
+        location.selectedLabel ||
+        location.selectedAddress ||
+        location.query ||
+        "Flexible";
+      return `${location.kind}: ${value}`;
+    })
+    .join(" | ");
 }
 
 function getConfirmationTitle(recognition: ReturnType<typeof recognizeEventIntent>) {
@@ -885,11 +1072,11 @@ function getConfirmationBody(recognition: ReturnType<typeof recognizeEventIntent
   const services = toFriendlyNeeds(profile.likelyNeeds ?? recognition.recommendedServices);
 
   if (profile.id === "pool-party") {
-    return "We will include rentals, food, drinks, shade, lighting, cleaning, and optional lifeguards.";
+    return "We will start with food, rentals, drinks, shade, lighting, cleanup, and optional lifeguards.";
   }
 
   if (profile.id === "bachelor-party") {
-    return "We will include venues, transportation, food and drinks, entertainment, and late-night options.";
+    return "We will start with venues, transportation, food and drinks, entertainment, and late-night options.";
   }
 
   if (profile.id === "funeral") {
@@ -901,7 +1088,7 @@ function getConfirmationBody(recognition: ReturnType<typeof recognizeEventIntent
       .toLowerCase()
       .includes("sweet")
   ) {
-    return "We will include DJ, cake, decor, photo booth, photographer, and rentals.";
+    return "We will start with DJ, cake, decor, photo booth, photographer, and rentals.";
   }
 
   return `We will help you find ${services}.`;
@@ -921,6 +1108,14 @@ function startsWithVowel(value: string) {
   return /^[aeiou]/i.test(value.trim());
 }
 
-function uniqueServices(services: ServiceName[]) {
-  return services.filter((service, index) => services.indexOf(service) === index);
+function normalizeId(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
+function capitalize(value: string) {
+  return `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
 }

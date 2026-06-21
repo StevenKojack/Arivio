@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type CalendarPickerProps = {
   label: string;
@@ -23,16 +23,20 @@ const monthNames = [
   "December",
 ];
 
-const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const dayNames = ["S", "M", "T", "W", "T", "F", "S"];
 
 export function CalendarPicker({ label, onChange, value }: CalendarPickerProps) {
+  const popoverRef = useRef<HTMLDivElement>(null);
   const selectedDate = value ? new Date(`${value}T12:00:00`) : null;
   const today = new Date();
   const [isOpen, setIsOpen] = useState(false);
   const [viewDate, setViewDate] = useState(
     selectedDate ?? new Date(today.getFullYear(), today.getMonth(), 1),
   );
-  const days = useMemo(() => getCalendarDays(viewDate), [viewDate]);
+  const months = useMemo(
+    () => [viewDate, new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1)],
+    [viewDate],
+  );
   const selectedLabel = selectedDate
     ? selectedDate.toLocaleDateString("en-US", {
         day: "numeric",
@@ -41,91 +45,88 @@ export function CalendarPicker({ label, onChange, value }: CalendarPickerProps) 
       })
     : "Choose a date";
 
+  useEffect(() => {
+    function closeOnOutsideClick(event: MouseEvent) {
+      if (
+        popoverRef.current &&
+        event.target instanceof Node &&
+        !popoverRef.current.contains(event.target)
+      ) {
+        setIsOpen(false);
+      }
+    }
+
+    if (isOpen) {
+      document.addEventListener("mousedown", closeOnOutsideClick);
+    }
+
+    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
+  }, [isOpen]);
+
   function moveMonth(offset: number) {
     setViewDate(
       (current) => new Date(current.getFullYear(), current.getMonth() + offset, 1),
     );
   }
 
-  function moveYear(offset: number) {
-    setViewDate(
-      (current) => new Date(current.getFullYear() + offset, current.getMonth(), 1),
-    );
+  function selectDate(dateValue: string) {
+    onChange(dateValue);
+    setIsOpen(false);
   }
 
   return (
-    <div>
+    <div className="relative">
       <p className="text-sm font-semibold text-neutral-800">{label}</p>
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="mt-2 flex h-14 w-full items-center justify-between rounded-2xl border border-neutral-300 bg-white px-4 text-left text-sm font-semibold text-neutral-950 shadow-[0_10px_30px_rgba(20,20,20,0.04)] transition hover:border-neutral-500"
+        className="mt-2 flex h-14 w-full items-center justify-between rounded-2xl border border-neutral-300 bg-white px-4 text-left text-sm font-semibold text-neutral-950 shadow-[0_10px_30px_rgba(20,20,20,0.04)] transition hover:-translate-y-0.5 hover:border-neutral-500 hover:shadow-[0_16px_40px_rgba(20,20,20,0.08)]"
       >
         <span>{selectedLabel}</span>
-        <span className="text-neutral-400">Calendar</span>
+        <span className="text-neutral-400">Date</span>
       </button>
 
       {isOpen ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-neutral-950/30 p-4 backdrop-blur-sm sm:items-center">
-          <div className="w-full max-w-lg rounded-[28px] bg-white p-5 shadow-[0_34px_120px_rgba(20,20,20,0.24)]">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">
-                  Select date
-                </p>
-                <h3 className="mt-1 text-2xl font-semibold tracking-tight">
-                  {monthNames[viewDate.getMonth()]} {viewDate.getFullYear()}
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsOpen(false)}
-                className="h-10 rounded-full border border-neutral-200 px-4 text-sm font-semibold"
-              >
-                Close
-              </button>
+        <div
+          ref={popoverRef}
+          className="absolute left-0 top-[88px] z-50 w-[min(92vw,760px)] rounded-[30px] border border-neutral-200 bg-white p-5 shadow-[0_34px_120px_rgba(20,20,20,0.22)]"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => moveMonth(-1)}
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-neutral-200 text-lg font-semibold transition hover:border-neutral-950"
+            >
+              {"<"}
+            </button>
+            <div className="text-center">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">
+                Select date
+              </p>
+              <p className="mt-1 text-lg font-semibold">
+                {monthNames[viewDate.getMonth()]} {viewDate.getFullYear()}
+              </p>
             </div>
+            <button
+              type="button"
+              onClick={() => moveMonth(1)}
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-neutral-200 text-lg font-semibold transition hover:border-neutral-950"
+            >
+              {">"}
+            </button>
+          </div>
 
-            <div className="mt-5 grid grid-cols-4 gap-2">
-              <CalendarNavButton label="- Year" onClick={() => moveYear(-1)} />
-              <CalendarNavButton label="- Month" onClick={() => moveMonth(-1)} />
-              <CalendarNavButton label="+ Month" onClick={() => moveMonth(1)} />
-              <CalendarNavButton label="+ Year" onClick={() => moveYear(1)} />
-            </div>
-
-            <div className="mt-5 grid grid-cols-7 gap-1 text-center text-xs font-semibold text-neutral-500">
-              {dayNames.map((day) => (
-                <span key={day}>{day}</span>
-              ))}
-            </div>
-
-            <div className="mt-2 grid grid-cols-7 gap-1">
-              {days.map((day) => {
-                const dateValue = toDateValue(day.date);
-                const isSelected = value === dateValue;
-                const isCurrentMonth = day.date.getMonth() === viewDate.getMonth();
-
-                return (
-                  <button
-                    key={dateValue}
-                    type="button"
-                    onClick={() => {
-                      onChange(dateValue);
-                      setIsOpen(false);
-                    }}
-                    className={`aspect-square rounded-2xl text-sm font-semibold transition ${
-                      isSelected
-                        ? "bg-neutral-950 text-white shadow-[0_10px_26px_rgba(20,20,20,0.22)]"
-                        : isCurrentMonth
-                          ? "text-neutral-900 hover:bg-neutral-100"
-                          : "text-neutral-300 hover:bg-neutral-50"
-                    }`}
-                  >
-                    {day.date.getDate()}
-                  </button>
-                );
-              })}
-            </div>
+          <div className="mt-5 grid gap-6 md:grid-cols-2">
+            {months.map((month, index) => (
+              <MonthView
+                key={`${month.getFullYear()}-${month.getMonth()}`}
+                month={month}
+                selectedValue={value}
+                showOnMobile={index === 0}
+                today={today}
+                onSelect={selectDate}
+              />
+            ))}
           </div>
         </div>
       ) : null}
@@ -133,21 +134,60 @@ export function CalendarPicker({ label, onChange, value }: CalendarPickerProps) 
   );
 }
 
-function CalendarNavButton({
-  label,
-  onClick,
+function MonthView({
+  month,
+  onSelect,
+  selectedValue,
+  showOnMobile,
+  today,
 }: {
-  label: string;
-  onClick: () => void;
+  month: Date;
+  onSelect: (value: string) => void;
+  selectedValue: string;
+  showOnMobile: boolean;
+  today: Date;
 }) {
+  const days = useMemo(() => getCalendarDays(month), [month]);
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="h-10 rounded-full border border-neutral-200 text-xs font-semibold text-neutral-700 transition hover:border-neutral-950 hover:text-neutral-950"
-    >
-      {label}
-    </button>
+    <div className={showOnMobile ? "" : "hidden md:block"}>
+      <h3 className="text-center text-sm font-semibold text-neutral-950">
+        {monthNames[month.getMonth()]} {month.getFullYear()}
+      </h3>
+      <div className="mt-4 grid grid-cols-7 gap-1 text-center text-xs font-semibold text-neutral-400">
+        {dayNames.map((day, index) => (
+          <span key={`${day}-${index}`}>{day}</span>
+        ))}
+      </div>
+      <div className="mt-2 grid grid-cols-7 gap-1">
+        {days.map((day) => {
+          const dateValue = toDateValue(day.date);
+          const isSelected = selectedValue === dateValue;
+          const isToday = toDateValue(today) === dateValue;
+          const isCurrentMonth = day.date.getMonth() === month.getMonth();
+
+          return (
+            <button
+              key={dateValue}
+              type="button"
+              onClick={() => onSelect(dateValue)}
+              className={`relative aspect-square rounded-2xl text-sm font-semibold transition ${
+                isSelected
+                  ? "bg-neutral-950 text-white shadow-[0_10px_26px_rgba(20,20,20,0.22)]"
+                  : isCurrentMonth
+                    ? "text-neutral-900 hover:bg-neutral-100"
+                    : "text-neutral-300 hover:bg-neutral-50"
+              }`}
+            >
+              {day.date.getDate()}
+              {isToday && !isSelected ? (
+                <span className="absolute bottom-2 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-[#d94f48]" />
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

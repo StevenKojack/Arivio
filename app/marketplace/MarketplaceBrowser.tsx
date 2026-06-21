@@ -77,6 +77,8 @@ export function MarketplaceBrowser() {
   const initialEventType = isEventType(initialEvent) ? initialEvent : "All";
   const initialGuests = Number(searchParams.get("guests") ?? 40);
   const initialBudget = searchParams.get("budget");
+  const initialLocation = searchParams.get("location") ?? "";
+  const initialNotes = searchParams.get("notes") ?? "";
   const initialRecommendedServices =
     initialEventType === "All" ? [] : eventPlanPresets[initialEventType].recommended;
   const [providers, setProviders] = useState<MarketplaceItem[]>(demoItems);
@@ -102,7 +104,7 @@ export function MarketplaceBrowser() {
     Number.isFinite(initialGuests) ? initialGuests : 40,
   );
   const [useHomeVenue, setUseHomeVenue] = useState(false);
-  const [homeAddress, setHomeAddress] = useState("");
+  const [homeAddress, setHomeAddress] = useState(initialLocation);
   const [homeAreaName, setHomeAreaName] = useState(homeAreas[0].name);
   const [liveCoordinates, setLiveCoordinates] = useState<Coordinates | null>(null);
   const [locationStatus, setLocationStatus] = useState("");
@@ -183,6 +185,12 @@ export function MarketplaceBrowser() {
   ]
     .filter(Boolean)
     .join(" - ");
+  const eventLocationLabel = useHomeVenue
+    ? homeAddress || homeAreaName
+    : selectedVenue?.name || initialLocation || "Not selected";
+  const serviceSummary = selectedServices.length
+    ? selectedServices.slice(0, 4).join(", ")
+    : "Open to suggestions";
   const normalizedQuery = query.trim().toLowerCase();
   const filteredItems = useMemo(() => {
     const nextItems = providers.filter((item) => {
@@ -557,11 +565,11 @@ export function MarketplaceBrowser() {
     <>
       <div className="grid gap-8 xl:grid-cols-[1fr_360px]">
         <div className="space-y-6">
-          <section className="rounded-[28px] border border-neutral-200 bg-white p-5 shadow-[0_18px_50px_rgba(20,20,20,0.05)]">
+          <section className="rounded-[32px] border border-neutral-200 bg-[linear-gradient(135deg,#ffffff,#fbfbfa)] p-5 shadow-[0_18px_50px_rgba(20,20,20,0.05)]">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.16em] text-neutral-500">
-                  Marketplace
+                  Event context
                 </p>
                 <h2 className="mt-2 text-3xl font-semibold tracking-tight text-neutral-950">
                   {planSummary ? `Best matches for ${planSummary}` : "Vendor collections"}
@@ -573,24 +581,23 @@ export function MarketplaceBrowser() {
               <button
                 type="button"
                 onClick={() => setIsFilterDrawerOpen(true)}
-                className="h-11 w-fit rounded-full border border-neutral-300 bg-white px-5 text-sm font-semibold text-neutral-950 transition hover:border-neutral-950"
+                className="h-11 w-fit rounded-full border border-neutral-300 bg-white px-5 text-sm font-semibold text-neutral-950 transition hover:-translate-y-0.5 hover:border-neutral-950"
               >
-                Filters
+                Edit event details
               </button>
             </div>
-            <div className="mt-5 grid gap-3 text-sm text-neutral-600 md:grid-cols-4">
+            <div className="mt-5 grid gap-3 text-sm text-neutral-600 md:grid-cols-5">
               <SummaryPill label="Date" value={eventDate || "Choose date"} />
               <SummaryPill label="Time" value={`${startTime} - ${endTime}`} />
               <SummaryPill label="Guests" value={guestCount.toLocaleString()} />
-              <SummaryPill
-                label="Location"
-                value={
-                  useHomeVenue
-                    ? homeAddress || homeAreaName
-                    : selectedVenue?.name || "Not selected"
-                }
-              />
+              <SummaryPill label="Location" value={eventLocationLabel} />
+              <SummaryPill label="Services" value={serviceSummary} />
             </div>
+            {initialNotes ? (
+              <p className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-neutral-700 shadow-[inset_0_0_0_1px_rgba(229,229,229,1)]">
+                Added details: {initialNotes}
+              </p>
+            ) : null}
           </section>
 
           <section className="grid gap-4 lg:grid-cols-[320px_1fr]">
@@ -758,7 +765,7 @@ function buildMarketplaceRows(items: MarketplaceItem[]): MarketplaceRowGroup[] {
     {
       description: "DJs, live music, and sound-forward services.",
       items: byServices(items, ["DJ", "Live Music"]),
-      title: "Music",
+      title: "Music and DJs",
     },
     {
       description: "Tables, chairs, lounge, booths, and event equipment.",
@@ -783,12 +790,17 @@ function buildMarketplaceRows(items: MarketplaceItem[]): MarketplaceRowGroup[] {
     {
       description: "Support teams for guest flow and event operations.",
       items: byServices(items, ["Staffing", "Security", "Registration"]),
-      title: "Staffing and security",
+      title: "Security and staffing",
     },
     {
-      description: "Transportation, production, livestreaming, and event logistics.",
-      items: byServices(items, ["Transportation", "AV Production", "Live Streaming"]),
-      title: "Logistics",
+      description: "Restrooms, production, livestreaming, and practical event support.",
+      items: byServices(items, ["Portable Restrooms", "AV Production", "Live Streaming"]),
+      title: "Restrooms and logistics",
+    },
+    {
+      description: "Passenger movement, shuttles, and point-to-point event transport.",
+      items: byServices(items, ["Transportation"]),
+      title: "Transportation",
     },
   ];
 

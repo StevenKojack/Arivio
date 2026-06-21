@@ -37,10 +37,10 @@ export function FilterDrawer({
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">
-              Filters
+              Event details
             </p>
             <h2 className="mt-1 text-2xl font-semibold tracking-tight">
-              Refine marketplace
+              Adjust what Arivio should match
             </h2>
           </div>
           <button
@@ -56,7 +56,7 @@ export function FilterDrawer({
           <input
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
-            placeholder="Search vendors, cities, or services"
+            placeholder="Search vendors, cities, or needs"
             className="h-12 rounded-2xl border border-neutral-300 px-4 text-sm font-semibold outline-none transition focus:border-neutral-950"
           />
           <select

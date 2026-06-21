@@ -31,7 +31,8 @@ export type ServiceName =
   | "Transportation"
   | "Security"
   | "Staffing"
-  | "Booth Rentals";
+  | "Booth Rentals"
+  | "Portable Restrooms";
 
 export type Coordinates = {
   lat: number;
@@ -170,6 +171,7 @@ export const allServices: ServiceName[] = [
   "Security",
   "Staffing",
   "Booth Rentals",
+  "Portable Restrooms",
 ];
 
 export const eventPlanPresets: Record<EventType, EventPlanPreset> = {

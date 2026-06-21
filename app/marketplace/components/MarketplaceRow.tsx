@@ -23,7 +23,7 @@ export function MarketplaceRow({
   }
 
   return (
-    <section className="rounded-[28px] border border-neutral-200 bg-white p-5 shadow-[0_18px_50px_rgba(20,20,20,0.05)]">
+    <section className="rounded-[30px] border border-neutral-200 bg-white p-5 shadow-[0_18px_50px_rgba(20,20,20,0.05)]">
       <div className="flex items-end justify-between gap-4">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight text-neutral-950">
@@ -43,6 +43,7 @@ export function MarketplaceRow({
             key={`${title}-${item.id}`}
             item={item}
             matchLabel={index < 3 ? "Top match" : "Match"}
+            matchReason={getMatchReason(title, item)}
             quote={quoteItem(item, quoteContext)}
             onAdd={onAdd}
           />
@@ -50,4 +51,18 @@ export function MarketplaceRow({
       </div>
     </section>
   );
+}
+
+function getMatchReason(title: string, item: MarketplaceItem) {
+  if (title === "Best matches") {
+    return `Strong fit for ${item.events.slice(0, 2).join(" and ")} with ${item.services
+      .slice(0, 2)
+      .join(" and ")} available.`;
+  }
+
+  if (item.serviceRadiusMiles) {
+    return `Serves this area within about ${item.serviceRadiusMiles} miles.`;
+  }
+
+  return `Fits the ${title.toLowerCase()} part of this event plan.`;
 }
