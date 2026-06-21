@@ -29,6 +29,9 @@ import {
   getEventById,
   getMarketplaceProviders,
 } from "@/lib/repositories/marketplaceRepository";
+import { getProfileByMarketplaceType } from "@/lib/event-intelligence/taxonomy";
+import { recognizeEventIntent } from "@/lib/event-intelligence/search";
+import { rankMarketplaceItems } from "@/lib/event-intelligence/recommendations";
 import {
   createCartItem,
   updateCartItemTime,
@@ -115,13 +118,16 @@ export function MarketplaceBrowser() {
     [providers],
   );
   const durationHours = getHoursBetween(startTime, endTime);
-  const globalQuoteContext: QuoteContext = {
-    date: eventDate,
-    durationHours,
-    endTime,
-    guests: guestCount,
-    startTime,
-  };
+  const globalQuoteContext: QuoteContext = useMemo(
+    () => ({
+      date: eventDate,
+      durationHours,
+      endTime,
+      guests: guestCount,
+      startTime,
+    }),
+    [durationHours, endTime, eventDate, guestCount, startTime],
+  );
   const selectedVenue = selectedVenueId
     ? venueItems.find((venue) => venue.id === selectedVenueId)
     : undefined;
@@ -182,7 +188,8 @@ export function MarketplaceBrowser() {
     .filter(Boolean)
     .join(" - ");
   const normalizedQuery = query.trim().toLowerCase();
-  const filteredItems = useMemo(() => providers.filter((item) => {
+  const filteredItems = useMemo(() => {
+    const nextItems = providers.filter((item) => {
     const matchesType = selectedType === "All" || item.type === selectedType;
     const matchesEvent =
       selectedEvent === "All" || item.events.includes(selectedEvent);
@@ -191,7 +198,7 @@ export function MarketplaceBrowser() {
       item.services.some((service) => selectedServices.includes(service));
     const searchText = `${item.name} ${item.location} ${item.address} ${item.events.join(
       " ",
-    )} ${item.services.join(" ")}`;
+    )} ${item.services.join(" ")} ${(item.tags ?? []).join(" ")}`;
     const matchesQuery =
       !normalizedQuery || searchText.toLowerCase().includes(normalizedQuery);
     const driveMinutes = eventCoordinates
@@ -229,10 +236,28 @@ export function MarketplaceBrowser() {
       isNearEnough &&
       matchesAvailability
     );
-  }), [
+    });
+
+    if (selectedEvent === "All") {
+      return nextItems;
+    }
+
+    const profile = getProfileByMarketplaceType(selectedEvent);
+    const rankedItems = rankMarketplaceItems(
+      nextItems,
+      recognizeEventIntent(profile.subtype ?? profile.primaryType),
+      {
+        coordinates: eventCoordinates,
+        quoteContext: globalQuoteContext,
+      },
+    );
+
+    return rankedItems.map((rankedItem) => rankedItem.item);
+  }, [
     endTime,
     eventCoordinates,
     eventDate,
+    globalQuoteContext,
     normalizedQuery,
     providers,
     savedEvent?.city,
