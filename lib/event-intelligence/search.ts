@@ -67,7 +67,7 @@ export function recognizeEventIntent(query: string): EventRecognition {
 export function searchEventIntents(query: string, limit = 7) {
   const normalizedQuery = normalizeSearchText(query);
 
-  if (!normalizedQuery) {
+  if (!normalizedQuery || normalizedQuery.length < 2) {
     return eventExamples.slice(0, limit).map((example) => {
       const recognition = recognizeEventIntent(example);
 
@@ -78,12 +78,18 @@ export function searchEventIntents(query: string, limit = 7) {
     });
   }
 
-  return scoreProfiles(normalizedQuery)
-    .slice(0, limit)
-    .map((match) => ({
-      label: buildSuggestionLabel(match.profile, query),
-      recognition: recognizeEventIntent(match.matchedAlias),
-    }));
+  const suggestions = scoreProfiles(normalizedQuery)
+    .filter((match) => match.score >= 0.45)
+    .map((match) => {
+      const label = getCompleteSuggestionLabel(match.profile, normalizedQuery);
+
+      return {
+        label,
+        recognition: recognizeEventIntent(label),
+      };
+    });
+
+  return uniqueSuggestions(suggestions).slice(0, limit);
 }
 
 function scoreProfiles(normalizedQuery: string) {
@@ -199,18 +205,6 @@ function inferSubtype(query: string, profile: EventTaxonomyProfile) {
   return trimmed;
 }
 
-function buildSuggestionLabel(profile: EventTaxonomyProfile, query: string) {
-  const subtype = inferSubtype(query, profile);
-
-  if (subtype && normalizeSearchText(subtype) !== normalizeSearchText(profile.primaryType)) {
-    return `${profile.primaryType}: ${subtype}`;
-  }
-
-  return profile.subtype
-    ? `${profile.primaryType}: ${profile.subtype}`
-    : profile.primaryType;
-}
-
 function getRecommendedServices(
   profile: EventTaxonomyProfile,
   normalizedQuery: string,
@@ -230,6 +224,43 @@ function getRecommendedServices(
   return Array.from(services).filter(
     (service) => !getExcludedServices(profile, normalizedQuery).includes(service),
   );
+}
+
+function getCompleteSuggestionLabel(
+  profile: EventTaxonomyProfile,
+  normalizedQuery: string,
+) {
+  const bestAlias =
+    profile.aliases.find((alias) => normalizeSearchText(alias).includes(normalizedQuery)) ??
+    profile.aliases[0];
+
+  return toTitleCase(bestAlias);
+}
+
+function uniqueSuggestions<TSuggestion extends { label: string }>(
+  suggestions: TSuggestion[],
+) {
+  const seen = new Set<string>();
+
+  return suggestions.filter((suggestion) => {
+    const key = normalizeSearchText(suggestion.label);
+
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
+
+function toTitleCase(value: string) {
+  return value
+    .split(" ")
+    .map((word) =>
+      word.length ? `${word[0].toUpperCase()}${word.slice(1).toLowerCase()}` : word,
+    )
+    .join(" ");
 }
 
 function getExcludedServices(

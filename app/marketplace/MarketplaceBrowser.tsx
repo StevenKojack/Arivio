@@ -1,11 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { MarketplaceCard } from "../components/MarketplaceCard";
 import {
-  entertainmentServices,
   estimateDriveMinutes,
   eventPlanPresets,
   eventTypes,
@@ -38,11 +35,13 @@ import {
 } from "@/lib/repositories/cartRepository";
 import { ensureCurrentProfile } from "@/lib/repositories/profilesRepository";
 import { requestQuotesFromCart } from "@/lib/services/quoteService";
+import { FilterDrawer } from "./components/FilterDrawer";
+import { MarketplaceRow } from "./components/MarketplaceRow";
+import { QuoteCartDrawer } from "./components/QuoteCartDrawer";
 
 type MarketplaceFilter = (typeof marketplaceTypes)[number];
 type EventRow = PublicTableRow<"events">;
 type ProfileRow = PublicTableRow<"profiles">;
-const PAGE_SIZE = 8;
 type CartLine = {
   cartItemId?: string;
   id: number;
@@ -86,7 +85,6 @@ export function MarketplaceBrowser() {
   );
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [savedEvent, setSavedEvent] = useState<EventRow | null>(null);
-  const [selectedType, setSelectedType] = useState<MarketplaceFilter>("All");
   const [selectedEvent, setSelectedEvent] = useState<EventType | "All">(
     initialEventType,
   );
@@ -94,7 +92,7 @@ export function MarketplaceBrowser() {
     initialServices ?? initialRecommendedServices,
   );
   const [query, setQuery] = useState("");
-  const [showAllServiceFilters, setShowAllServiceFilters] = useState(false);
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
   const [eventDate, setEventDate] = useState(searchParams.get("date") ?? "");
   const [startTime, setStartTime] = useState(searchParams.get("time") ?? "14:00");
   const [endTime, setEndTime] = useState(
@@ -111,7 +109,6 @@ export function MarketplaceBrowser() {
   const [selectedVenueId, setSelectedVenueId] = useState<number | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [cartMessage, setCartMessage] = useState("");
-  const [page, setPage] = useState(1);
   const [isRequestingQuotes, setIsRequestingQuotes] = useState(false);
   const venueItems = useMemo(
     () => providers.filter((item) => item.type === "Venue"),
@@ -170,16 +167,15 @@ export function MarketplaceBrowser() {
         : [],
     [eventCoordinates, providers],
   );
-  const visibleMarketplaceTypes =
-    showAllServiceFilters || selectedEvent === "All"
+  const visibleMarketplaceTypes = (
+    selectedEvent === "All"
       ? marketplaceTypes
-      : ([
+      : [
           "All",
           ...eventPlanPresets[selectedEvent].recommended,
           ...selectedServices,
-        ].filter(
-          (service, index, services) => services.indexOf(service) === index,
-        ) as MarketplaceFilter[]);
+        ].filter((service, index, services) => services.indexOf(service) === index)
+  ).filter((service): service is ServiceName => service !== "All");
   const planSummary = [
     isEventType(initialEvent) ? initialEvent : null,
     guestCount ? `${guestCount.toLocaleString()} guests` : null,
@@ -190,52 +186,50 @@ export function MarketplaceBrowser() {
   const normalizedQuery = query.trim().toLowerCase();
   const filteredItems = useMemo(() => {
     const nextItems = providers.filter((item) => {
-    const matchesType = selectedType === "All" || item.type === selectedType;
-    const matchesEvent =
-      selectedEvent === "All" || item.events.includes(selectedEvent);
-    const matchesServices =
-      selectedServices.length === 0 ||
-      item.services.some((service) => selectedServices.includes(service));
-    const searchText = `${item.name} ${item.location} ${item.address} ${item.events.join(
-      " ",
-    )} ${item.services.join(" ")} ${(item.tags ?? []).join(" ")}`;
-    const matchesQuery =
-      !normalizedQuery || searchText.toLowerCase().includes(normalizedQuery);
-    const driveMinutes = eventCoordinates
-      ? estimateDriveMinutes(eventCoordinates, item.coordinates)
-      : 0;
-    const miles = eventCoordinates
-      ? getDistanceMiles(eventCoordinates, item.coordinates)
-      : 0;
-    const matchesCity =
-      !savedEvent?.city ||
-      item.type === "Venue" ||
-      item.location.toLowerCase().includes(savedEvent.city.toLowerCase()) ||
-      item.address.toLowerCase().includes(savedEvent.city.toLowerCase());
-    const withinRadius =
-      !eventCoordinates ||
-      item.type === "Venue" ||
-      !item.serviceRadiusMiles ||
-      miles <= item.serviceRadiusMiles;
-    const isNearEnough =
-      !eventCoordinates || item.type === "Venue" || driveMinutes <= 60;
-    const matchesAvailability = isAvailableAt(
-      item,
-      eventDate,
-      startTime,
-      endTime,
-    );
+      const matchesEvent =
+        selectedEvent === "All" || item.events.includes(selectedEvent);
+      const matchesServices =
+        selectedServices.length === 0 ||
+        item.services.some((service) => selectedServices.includes(service));
+      const searchText = `${item.name} ${item.location} ${item.address} ${item.events.join(
+        " ",
+      )} ${item.services.join(" ")} ${(item.tags ?? []).join(" ")}`;
+      const matchesQuery =
+        !normalizedQuery || searchText.toLowerCase().includes(normalizedQuery);
+      const driveMinutes = eventCoordinates
+        ? estimateDriveMinutes(eventCoordinates, item.coordinates)
+        : 0;
+      const miles = eventCoordinates
+        ? getDistanceMiles(eventCoordinates, item.coordinates)
+        : 0;
+      const matchesCity =
+        !savedEvent?.city ||
+        item.type === "Venue" ||
+        item.location.toLowerCase().includes(savedEvent.city.toLowerCase()) ||
+        item.address.toLowerCase().includes(savedEvent.city.toLowerCase());
+      const withinRadius =
+        !eventCoordinates ||
+        item.type === "Venue" ||
+        !item.serviceRadiusMiles ||
+        miles <= item.serviceRadiusMiles;
+      const isNearEnough =
+        !eventCoordinates || item.type === "Venue" || driveMinutes <= 60;
+      const matchesAvailability = isAvailableAt(
+        item,
+        eventDate,
+        startTime,
+        endTime,
+      );
 
-    return (
-      matchesType &&
-      matchesEvent &&
-      matchesServices &&
-      matchesQuery &&
-      matchesCity &&
-      withinRadius &&
-      isNearEnough &&
-      matchesAvailability
-    );
+      return (
+        matchesEvent &&
+        matchesServices &&
+        matchesQuery &&
+        matchesCity &&
+        withinRadius &&
+        isNearEnough &&
+        matchesAvailability
+      );
     });
 
     if (selectedEvent === "All") {
@@ -263,17 +257,13 @@ export function MarketplaceBrowser() {
     savedEvent?.city,
     selectedEvent,
     selectedServices,
-    selectedType,
     startTime,
   ]);
-  const totalPages = Math.max(Math.ceil(filteredItems.length / PAGE_SIZE), 1);
-  const currentPage = Math.min(page, totalPages);
-  const pagedItems = filteredItems.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE,
-  );
-  const cartTotal = cart.reduce((total, line) => total + getLineQuote(line), 0);
   const canSaveCart = Boolean(profile && savedEvent);
+  const marketplaceRows = useMemo(
+    () => buildMarketplaceRows(filteredItems),
+    [filteredItems],
+  );
 
   useEffect(() => {
     async function loadMarketplace() {
@@ -350,14 +340,6 @@ export function MarketplaceBrowser() {
     return quoteItem(line.item, getLineContext(line));
   }
 
-  function getDriveMinutes(item: MarketplaceItem) {
-    if (!eventCoordinates || item.type === "Venue") {
-      return undefined;
-    }
-
-    return estimateDriveMinutes(eventCoordinates, item.coordinates);
-  }
-
   function toggleService(service: ServiceName) {
     setSelectedServices((current) =>
       current.includes(service)
@@ -368,9 +350,7 @@ export function MarketplaceBrowser() {
 
   function chooseEventType(nextEvent: EventType | "All") {
     setSelectedEvent(nextEvent);
-    setSelectedType("All");
     setQuery("");
-    setShowAllServiceFilters(false);
     setSelectedServices(
       nextEvent === "All" ? [] : eventPlanPresets[nextEvent].recommended,
     );
@@ -574,101 +554,52 @@ export function MarketplaceBrowser() {
   }
 
   return (
-    <div className="grid gap-8 xl:grid-cols-[1fr_380px]">
-      <div>
-        <div className="rounded-lg border border-neutral-200 bg-white p-4 shadow-[0_18px_44px_rgba(20,20,20,0.05)]">
-          {planSummary ? (
-            <div className="mb-4 rounded-lg bg-[#fff5f5] px-4 py-3 text-sm font-semibold text-[#b73532]">
-              Matches for {planSummary}
+    <>
+      <div className="grid gap-8 xl:grid-cols-[1fr_360px]">
+        <div className="space-y-6">
+          <section className="rounded-[28px] border border-neutral-200 bg-white p-5 shadow-[0_18px_50px_rgba(20,20,20,0.05)]">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-neutral-500">
+                  Marketplace
+                </p>
+                <h2 className="mt-2 text-3xl font-semibold tracking-tight text-neutral-950">
+                  {planSummary ? `Best matches for ${planSummary}` : "Vendor collections"}
+                </h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-600">
+                  {marketplaceMessage}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsFilterDrawerOpen(true)}
+                className="h-11 w-fit rounded-full border border-neutral-300 bg-white px-5 text-sm font-semibold text-neutral-950 transition hover:border-neutral-950"
+              >
+                Filters
+              </button>
             </div>
-          ) : null}
-
-          <div className="mb-4 grid gap-3 md:grid-cols-2">
-            <p className="rounded-lg border border-neutral-200 bg-[#fbfbfa] px-4 py-3 text-sm font-semibold text-neutral-700">
-              {marketplaceMessage}
-            </p>
-            {!canSaveCart ? (
-              <p className="rounded-lg border border-[#ffd6d7] bg-[#fff8f8] px-4 py-3 text-sm font-semibold text-[#b73532]">
-                Log in to save your quote cart.
-              </p>
-            ) : (
-              <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
-                Cart saves to event: {savedEvent?.title}
-              </p>
-            )}
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search by name, city, event, address, or service"
-              className="h-12 rounded-lg border border-neutral-300 px-4 text-sm font-medium outline-none transition focus:border-neutral-950"
-            />
-            <select
-              value={selectedEvent}
-              onChange={(event) =>
-                chooseEventType(event.target.value as EventType | "All")
-              }
-              className="h-12 rounded-lg border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-800 outline-none transition focus:border-neutral-950"
-            >
-              <option>All</option>
-              {eventTypes.map((eventType) => (
-                <option key={eventType}>{eventType}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <label className="text-xs font-semibold uppercase tracking-[0.12em] text-neutral-500">
-              Date
-              <input
-                value={eventDate}
-                onChange={(event) => setEventDate(event.target.value)}
-                type="date"
-                className="mt-2 h-11 w-full rounded-lg border border-neutral-300 px-3 text-sm font-semibold normal-case tracking-normal text-neutral-900 outline-none focus:border-neutral-950"
+            <div className="mt-5 grid gap-3 text-sm text-neutral-600 md:grid-cols-4">
+              <SummaryPill label="Date" value={eventDate || "Choose date"} />
+              <SummaryPill label="Time" value={`${startTime} - ${endTime}`} />
+              <SummaryPill label="Guests" value={guestCount.toLocaleString()} />
+              <SummaryPill
+                label="Location"
+                value={
+                  useHomeVenue
+                    ? homeAddress || homeAreaName
+                    : selectedVenue?.name || "Not selected"
+                }
               />
-            </label>
-            <label className="text-xs font-semibold uppercase tracking-[0.12em] text-neutral-500">
-              Party start
-              <input
-                value={startTime}
-                onChange={(event) => setStartTime(event.target.value)}
-                type="time"
-                className="mt-2 h-11 w-full rounded-lg border border-neutral-300 px-3 text-sm font-semibold normal-case tracking-normal text-neutral-900 outline-none focus:border-neutral-950"
-              />
-            </label>
-            <label className="text-xs font-semibold uppercase tracking-[0.12em] text-neutral-500">
-              Party end
-              <input
-                value={endTime}
-                onChange={(event) => setEndTime(event.target.value)}
-                type="time"
-                className="mt-2 h-11 w-full rounded-lg border border-neutral-300 px-3 text-sm font-semibold normal-case tracking-normal text-neutral-900 outline-none focus:border-neutral-950"
-              />
-            </label>
-            <label className="text-xs font-semibold uppercase tracking-[0.12em] text-neutral-500">
-              Guests
-              <input
-                value={guestCount}
-                onChange={(event) => setGuestCount(Number(event.target.value))}
-                type="number"
-                min="1"
-                className="mt-2 h-11 w-full rounded-lg border border-neutral-300 px-3 text-sm font-semibold normal-case tracking-normal text-neutral-900 outline-none focus:border-neutral-950"
-              />
-            </label>
-          </div>
+            </div>
+          </section>
 
-          <div className="mt-5 grid gap-4 xl:grid-cols-[360px_1fr]">
-            <div className="rounded-lg border border-neutral-200 bg-[#fbfbfa] p-4">
+          <section className="grid gap-4 lg:grid-cols-[320px_1fr]">
+            <div className="rounded-[28px] border border-neutral-200 bg-white p-5">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-neutral-950">
-                    Party venue
-                  </p>
+                  <p className="text-sm font-semibold text-neutral-950">Location context</p>
                   <p className="mt-1 text-sm text-neutral-600">
-                    Pick a venue or use your home so providers stay within an
-                    estimated one-hour drive.
+                    Used for distance estimates only.
                   </p>
                 </div>
                 <button
@@ -680,51 +611,37 @@ export function MarketplaceBrowser() {
                       : "border border-neutral-300 bg-white text-neutral-800"
                   }`}
                 >
-                  Use my home
+                  My home
                 </button>
               </div>
-
               {useHomeVenue ? (
                 <div className="mt-4 grid gap-3">
                   <input
                     value={homeAddress}
                     onChange={(event) => setHomeAddress(event.target.value)}
-                    placeholder="Home address or use current location"
-                    className="h-11 rounded-lg border border-neutral-300 px-3 text-sm font-semibold text-neutral-900 outline-none focus:border-neutral-950"
+                    placeholder="Home address"
+                    className="h-11 rounded-2xl border border-neutral-300 px-3 text-sm font-semibold text-neutral-900 outline-none focus:border-neutral-950"
                   />
-                  <select
-                    value={homeAreaName}
-                    onChange={(event) => setHomeAreaName(event.target.value)}
-                    className="h-11 rounded-lg border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-900 outline-none focus:border-neutral-950"
-                  >
-                    {homeAreas.map((area) => (
-                      <option key={area.name}>{area.name}</option>
-                    ))}
-                  </select>
                   <button
                     type="button"
                     onClick={useCurrentLocation}
                     className="h-11 rounded-full bg-neutral-950 px-4 text-sm font-semibold text-white transition hover:bg-neutral-800"
                   >
-                    Autofill live location
+                    Use live location
                   </button>
                   {locationStatus ? (
-                    <p className="text-xs font-semibold text-neutral-600">
-                      {locationStatus}
-                    </p>
+                    <p className="text-xs font-semibold text-neutral-600">{locationStatus}</p>
                   ) : null}
                 </div>
               ) : (
                 <select
                   value={selectedVenueId ?? ""}
                   onChange={(event) =>
-                    setSelectedVenueId(
-                      event.target.value ? Number(event.target.value) : null,
-                    )
+                    setSelectedVenueId(event.target.value ? Number(event.target.value) : null)
                   }
-                  className="mt-4 h-11 w-full rounded-lg border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-900 outline-none focus:border-neutral-950"
+                  className="mt-4 h-11 w-full rounded-2xl border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-900 outline-none focus:border-neutral-950"
                 >
-                  <option value="">Select a venue from the map</option>
+                  <option value="">Select a venue</option>
                   {venueItems.map((venue) => (
                     <option key={venue.id} value={venue.id}>
                       {venue.name}
@@ -733,7 +650,6 @@ export function MarketplaceBrowser() {
                 </select>
               )}
             </div>
-
             <VenueMap
               selectedVenueId={selectedVenueId}
               useHomeVenue={useHomeVenue}
@@ -741,7 +657,7 @@ export function MarketplaceBrowser() {
               venues={venueItems}
               onSelectVenue={setSelectedVenueId}
             />
-          </div>
+          </section>
 
           <LocationEstimatePanel
             eventCoordinates={eventCoordinates}
@@ -751,299 +667,139 @@ export function MarketplaceBrowser() {
             selectedVenueName={selectedVenue?.name}
           />
 
-          <div className="mt-5 rounded-lg border border-[#ffd6d7] bg-[#fff8f8] p-4">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <p className="text-sm font-semibold text-neutral-950">
-                  Entertainment hub
-                </p>
-                <p className="mt-1 text-sm text-neutral-600">
-                  DJ, live music, magic, character performers, and photo booths
-                  are separate bookable services.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {entertainmentServices.map((service) => (
-                  <button
-                    key={service}
-                    type="button"
-                    onClick={() => toggleService(service)}
-                    className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
-                      selectedServices.includes(service)
-                        ? "bg-[#ff5a5f] text-white"
-                        : "border border-[#ffc5c7] bg-white text-[#b73532] hover:border-[#ff5a5f]"
-                    }`}
-                  >
-                    {service}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            {visibleMarketplaceTypes.map((type) => (
-              <button
-                key={type}
-                type="button"
-                onClick={() => setSelectedType(type)}
-                className={`h-10 rounded-full px-4 text-sm font-semibold transition ${
-                  selectedType === type
-                    ? "bg-neutral-950 text-white"
-                    : "border border-neutral-300 bg-white text-neutral-700 hover:border-neutral-950"
-                }`}
-              >
-                {type}
-              </button>
-            ))}
-            {selectedEvent !== "All" ? (
-              <button
-                type="button"
-                onClick={() => setShowAllServiceFilters((current) => !current)}
-                className="h-10 rounded-full border border-[#ffc5c7] bg-[#fff8f8] px-4 text-sm font-semibold text-[#b73532] transition hover:border-[#ff5a5f]"
-              >
-                {showAllServiceFilters ? "Show recommended" : "More services"}
-              </button>
-            ) : null}
-          </div>
-
-          {selectedServices.length ? (
-            <div className="mt-4 flex flex-wrap gap-2 border-t border-neutral-100 pt-4">
-              {selectedServices.map((service) => (
-                <button
-                  key={service}
-                  type="button"
-                  onClick={() => toggleService(service)}
-                  className="rounded-full bg-neutral-950 px-3 py-1 text-xs font-semibold text-white transition hover:bg-neutral-700"
-                >
-                  {service} x
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </div>
-
-        {filteredItems.length ? (
-          <>
-            <div className="mt-8 flex flex-col justify-between gap-3 rounded-lg border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-600 sm:flex-row sm:items-center">
-              <p>
-                Showing {(currentPage - 1) * PAGE_SIZE + 1}-
-                {Math.min(currentPage * PAGE_SIZE, filteredItems.length)} of{" "}
-                {filteredItems.length} providers
-              </p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPage((current) => Math.max(current - 1, 1))}
-                  disabled={currentPage === 1}
-                  className="h-9 rounded-full border border-neutral-300 px-4 text-xs font-semibold text-neutral-950 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Previous
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPage((current) => Math.min(current + 1, totalPages))
-                  }
-                  disabled={currentPage === totalPages}
-                  className="h-9 rounded-full border border-neutral-300 px-4 text-xs font-semibold text-neutral-950 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-            <div className="mt-5 grid animate-[fadeUp_280ms_ease-out] gap-5 md:grid-cols-2">
-              {pagedItems.map((item) => (
-                <MarketplaceCard
-                  key={item.id}
-                  available={isAvailableAt(item, eventDate, startTime, endTime)}
-                  driveMinutes={getDriveMinutes(item)}
-                  item={item}
-                  quote={quoteItem(item, globalQuoteContext)}
+          {marketplaceRows.length ? (
+            <div className="space-y-6 animate-[fadeUp_280ms_ease-out]">
+              {marketplaceRows.map((row) => (
+                <MarketplaceRow
+                  key={row.title}
+                  title={row.title}
+                  description={row.description}
+                  items={row.items}
+                  quoteContext={globalQuoteContext}
                   onAdd={addToCart}
                 />
               ))}
             </div>
-          </>
-        ) : (
-          <div className="mt-8 rounded-lg border border-dashed border-neutral-300 bg-white p-8 text-center">
-            <h2 className="text-2xl font-semibold tracking-tight text-neutral-950">
-              No providers within one hour
-            </h2>
-            <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-neutral-600">
-              Try a closer venue, a different home area, or clear one of the
-              service filters. Arivio currently hides providers estimated to be
-              more than one hour away in normal traffic.
-            </p>
-          </div>
-        )}
-      </div>
-
-      <aside className="sticky top-24 h-fit rounded-lg border border-neutral-200 bg-neutral-950 p-5 text-white shadow-[0_24px_70px_rgba(20,20,20,0.18)]">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#ff8b8f]">
-              Quote cart
-            </p>
-            <h2 className="mt-3 text-2xl font-semibold tracking-tight">
-              Build your booking stack
-            </h2>
-          </div>
-          <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-neutral-950">
-            {cart.length}
-          </span>
-        </div>
-
-        <div className="mt-5 rounded-lg border border-white/10 bg-white/5 p-4 text-sm text-neutral-300">
-          <p>
-            {eventDate || "Choose a date"} from {startTime} to {endTime}
-          </p>
-          <p className="mt-1">{guestCount.toLocaleString()} guests</p>
-          <p className="mt-1">
-            Venue:{" "}
-            {useHomeVenue
-              ? homeAddress || homeAreaName
-              : selectedVenue?.name || "not selected"}
-          </p>
-        </div>
-
-        {!canSaveCart ? (
-          <Link
-            href="/auth/login"
-            className="mt-4 block rounded-lg border border-[#ff8b8f]/40 bg-[#ff5a5f]/10 px-4 py-3 text-sm font-semibold text-[#ffd5d7]"
-          >
-            Log in to save your quote cart.
-          </Link>
-        ) : null}
-
-        {cartMessage ? (
-          <p className="mt-4 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white">
-            {cartMessage}
-          </p>
-        ) : null}
-
-        <div className="mt-5 space-y-3">
-          {cart.length ? (
-            cart.map((line) => {
-              const lineQuote = getLineQuote(line);
-              const lineAvailable = isAvailableAt(
-                line.item,
-                eventDate,
-                line.serviceStart,
-                line.serviceEnd,
-              );
-
-              return (
-                <div
-                  key={line.item.id}
-                  className="rounded-lg border border-white/10 bg-white p-4 text-neutral-950"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-semibold">{line.item.name}</p>
-                      <p className="mt-1 text-xs font-medium text-neutral-500">
-                        {line.item.type} - {line.item.pricing.label}
-                      </p>
-                      <p className="mt-1 text-xs font-semibold text-neutral-500">
-                        {line.persisted
-                          ? "Saved cart item"
-                          : line.item.databaseSource
-                            ? "Not saved yet"
-                            : "Demo provider"}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeFromCart(line.item.id)}
-                      className="text-xs font-semibold text-neutral-500 transition hover:text-neutral-950"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-500">
-                      Start
-                      <input
-                        type="time"
-                        value={line.serviceStart}
-                        onChange={(event) =>
-                          updateCartTime(
-                            line.item.id,
-                            "serviceStart",
-                            event.target.value,
-                          )
-                        }
-                        className="mt-1 h-9 w-full rounded-md border border-neutral-200 px-2 text-sm text-neutral-950"
-                      />
-                    </label>
-                    <label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-500">
-                      End
-                      <input
-                        type="time"
-                        value={line.serviceEnd}
-                        onChange={(event) =>
-                          updateCartTime(
-                            line.item.id,
-                            "serviceEnd",
-                            event.target.value,
-                          )
-                        }
-                        className="mt-1 h-9 w-full rounded-md border border-neutral-200 px-2 text-sm text-neutral-950"
-                      />
-                    </label>
-                  </div>
-                  <div className="mt-3 flex items-end justify-between gap-3">
-                    <div>
-                      <p className="text-xl font-semibold">
-                        ${lineQuote.toLocaleString()}
-                      </p>
-                      <p
-                        className={`mt-1 text-xs font-semibold ${
-                          lineAvailable ? "text-emerald-700" : "text-amber-700"
-                        }`}
-                      >
-                        {lineAvailable ? "Available for this window" : "Check this time"}
-                      </p>
-                    </div>
-                    {line.item.sourceUrl !== "#" ? (
-                      <a
-                        href={line.item.sourceUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs font-semibold text-[#c33d38]"
-                      >
-                        Source
-                      </a>
-                    ) : null}
-                  </div>
-                </div>
-              );
-            })
           ) : (
-            <div className="rounded-lg border border-dashed border-white/20 p-5 text-sm leading-6 text-neutral-300">
-              Add vendors to see an itemized estimate. Each provider can have a
-              different start and end time, so entertainment can cover only part
-              of the party.
+            <div className="rounded-[28px] border border-dashed border-neutral-300 bg-white p-8 text-center">
+              <h2 className="text-2xl font-semibold tracking-tight text-neutral-950">
+                No close matches yet
+              </h2>
+              <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-neutral-600">
+                Try opening filters or adjusting the location context.
+              </p>
             </div>
           )}
         </div>
 
-        <div className="mt-5 border-t border-white/10 pt-5">
-          <div className="flex items-end justify-between">
-            <p className="text-sm text-neutral-400">Estimated total</p>
-            <p className="text-3xl font-semibold">${cartTotal.toLocaleString()}</p>
-          </div>
-          <button
-            type="button"
-            onClick={requestQuotes}
-            disabled={isRequestingQuotes}
-            className="mt-5 h-12 w-full rounded-full bg-[#ff5a5f] text-sm font-semibold text-white shadow-[0_14px_30px_rgba(255,90,95,0.25)] transition hover:-translate-y-0.5 hover:bg-[#e84f54] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isRequestingQuotes ? "Requesting..." : "Request quotes"}
-          </button>
-        </div>
-      </aside>
+        <QuoteCartDrawer
+          canSaveCart={canSaveCart}
+          cart={cart}
+          cartMessage={cartMessage}
+          eventSummary={`${eventDate || "Choose a date"} from ${startTime} to ${endTime}`}
+          getLineQuote={getLineQuote}
+          isRequestingQuotes={isRequestingQuotes}
+          onRemove={removeFromCart}
+          onRequestQuotes={requestQuotes}
+          onUpdateTime={updateCartTime}
+        />
+      </div>
+
+      <FilterDrawer
+        eventTypes={eventTypes}
+        isOpen={isFilterDrawerOpen}
+        query={query}
+        selectedEvent={selectedEvent}
+        selectedServices={selectedServices}
+        serviceOptions={visibleMarketplaceTypes}
+        onClose={() => setIsFilterDrawerOpen(false)}
+        onEventChange={chooseEventType}
+        onQueryChange={setQuery}
+        onToggleService={toggleService}
+      />
+    </>
+  );
+}
+
+type MarketplaceRowGroup = {
+  description: string;
+  items: MarketplaceItem[];
+  title: string;
+};
+
+function SummaryPill({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-[#f7f7f5] px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-neutral-400">
+        {label}
+      </p>
+      <p className="mt-1 truncate text-sm font-semibold text-neutral-800">{value}</p>
     </div>
+  );
+}
+
+function buildMarketplaceRows(items: MarketplaceItem[]): MarketplaceRowGroup[] {
+  const rows: MarketplaceRowGroup[] = [
+    {
+      description: "The strongest matches based on your event details.",
+      items: items.slice(0, 10),
+      title: "Best matches",
+    },
+    {
+      description: "Spaces and venues for the event itself.",
+      items: byServices(items, ["Venue"]),
+      title: "Venues",
+    },
+    {
+      description: "Food, catering, cake, and dessert options.",
+      items: byServices(items, ["Catering", "Cake & Desserts"]),
+      title: "Food and catering",
+    },
+    {
+      description: "DJs, live music, and sound-forward services.",
+      items: byServices(items, ["DJ", "Live Music"]),
+      title: "Music",
+    },
+    {
+      description: "Tables, chairs, lounge, booths, and event equipment.",
+      items: byServices(items, ["Rentals", "Booth Rentals"]),
+      title: "Rentals",
+    },
+    {
+      description: "Photographers, booths, and visual coverage.",
+      items: byServices(items, ["Photography", "Photo Booth"]),
+      title: "Photo and video",
+    },
+    {
+      description: "Performers and specialty entertainment when appropriate.",
+      items: byServices(items, ["Magic", "Character Performers"]),
+      title: "Entertainment",
+    },
+    {
+      description: "Florals, invitations, programs, and presentation details.",
+      items: byServices(items, ["Florals", "Invitations", "Printed Programs", "Printed Materials"]),
+      title: "Decor",
+    },
+    {
+      description: "Support teams for guest flow and event operations.",
+      items: byServices(items, ["Staffing", "Security", "Registration"]),
+      title: "Staffing and security",
+    },
+    {
+      description: "Transportation, production, livestreaming, and event logistics.",
+      items: byServices(items, ["Transportation", "AV Production", "Live Streaming"]),
+      title: "Logistics",
+    },
+  ];
+
+  return rows.filter((row) => row.items.length > 0);
+}
+
+function byServices(items: MarketplaceItem[], services: ServiceName[]) {
+  return items.filter(
+    (item) =>
+      services.includes(item.type) ||
+      item.services.some((service) => services.includes(service)),
   );
 }
 

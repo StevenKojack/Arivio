@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import type { ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import {
+  allServices,
   getHoursBetween,
   homeAreas,
   marketplaceItems,
@@ -24,6 +24,10 @@ import {
 } from "@/lib/event-intelligence/search";
 import { createBrowserSupabaseClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { getMarketplaceProviders } from "@/lib/repositories/marketplaceRepository";
+import { CalendarPicker } from "./components/CalendarPicker";
+import { ServiceRecommendationCard } from "./components/ServiceRecommendationCard";
+import { StepCard } from "./components/StepCard";
+import { TimeDurationPicker } from "./components/TimeDurationPicker";
 
 type LocationChoice = "home" | "need_venue" | "have_venue" | "not_sure";
 
@@ -61,8 +65,13 @@ export function EventWizard() {
   const [timing, setTiming] = useState({
     date: "",
     endTime: "22:00",
+    endDate: "",
+    setupTime: "17:00",
     startTime: "18:00",
+    teardownTime: "23:00",
   });
+  const [showAdvancedTiming, setShowAdvancedTiming] = useState(false);
+  const [isMultiDay, setIsMultiDay] = useState(false);
   const [locationChoice, setLocationChoice] = useState<LocationChoice>("not_sure");
   const [locationDetail, setLocationDetail] = useState("");
   const [guestCount, setGuestCount] = useState(60);
@@ -205,7 +214,7 @@ export function EventWizard() {
         <StepRail currentStep={step} />
         <div className="mt-8 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-[0_28px_90px_rgba(20,20,20,0.08)]">
           {step === 0 ? (
-            <StepShell
+            <StepCard
               eyebrow="Step 1"
               title="What are you planning?"
               body="Type the event naturally. Arivio will infer the profile in the background."
@@ -226,63 +235,105 @@ export function EventWizard() {
                 onChange={setQuery}
                 onSelect={continueFromSearch}
               />
-            </StepShell>
+            </StepCard>
           ) : null}
 
           {step === 1 ? (
-            <StepShell
+            <StepCard
               eyebrow="Step 2"
-              title="Here's what we understood."
-              body="Confirm the profile before we ask for timing, location, and budget."
+              title={getConfirmationTitle(recognition)}
+              body={getConfirmationBody(recognition)}
               action={<PrimaryButton label="Looks right" onClick={() => setStep(2)} />}
             >
               <UnderstandingCard
                 customNote={customNote}
                 onCustomNoteChange={setCustomNote}
                 recognition={recognition}
+                selectedServices={selectedServices}
+                onToggleService={toggleService}
+                onAddService={(service) =>
+                  setSelectedServices((current) =>
+                    current.includes(service) ? current : [...current, service],
+                  )
+                }
               />
-            </StepShell>
+            </StepCard>
           ) : null}
 
           {step === 2 ? (
-            <StepShell
+            <StepCard
               eyebrow="Step 3"
               title="When is it?"
               body="Date and time drive availability, pricing, and vendor fit."
               action={<PrimaryButton label="Continue" onClick={() => setStep(3)} />}
             >
-              <div className="grid gap-4 md:grid-cols-3">
-                <TimingField
+              <div className="grid gap-5">
+                <CalendarPicker
                   label="Date"
-                  type="date"
                   value={timing.date}
                   onChange={(value) => setTiming((current) => ({ ...current, date: value }))}
                 />
-                <TimingField
-                  label="Start time"
-                  type="time"
-                  value={timing.startTime}
-                  onChange={(value) =>
+                <TimeDurationPicker
+                  startTime={timing.startTime}
+                  endTime={timing.endTime}
+                  onStartTimeChange={(value) =>
                     setTiming((current) => ({ ...current, startTime: value }))
                   }
-                />
-                <TimingField
-                  label="End time"
-                  type="time"
-                  value={timing.endTime}
-                  onChange={(value) =>
+                  onEndTimeChange={(value) =>
                     setTiming((current) => ({ ...current, endTime: value }))
                   }
                 />
               </div>
-              <p className="mt-4 rounded-lg bg-[#f7f7f5] px-4 py-3 text-sm font-semibold text-neutral-600">
-                Estimated event window: {quoteContext.durationHours} hours
-              </p>
-            </StepShell>
+              <button
+                type="button"
+                onClick={() => setShowAdvancedTiming((current) => !current)}
+                className="mt-5 rounded-full border border-neutral-200 px-4 py-2 text-sm font-semibold text-neutral-700 transition hover:border-neutral-950"
+              >
+                {showAdvancedTiming ? "Hide advanced timing" : "Advanced timing"}
+              </button>
+              {showAdvancedTiming ? (
+                <div className="mt-4 grid gap-4 rounded-[24px] border border-neutral-200 bg-[#fbfbfa] p-4 md:grid-cols-2">
+                  <label className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-neutral-800">
+                    Multi-day event
+                    <input
+                      type="checkbox"
+                      checked={isMultiDay}
+                      onChange={(event) => setIsMultiDay(event.target.checked)}
+                      className="h-5 w-5 accent-neutral-950"
+                    />
+                  </label>
+                  {isMultiDay ? (
+                    <CalendarPicker
+                      label="End date"
+                      value={timing.endDate}
+                      onChange={(value) =>
+                        setTiming((current) => ({ ...current, endDate: value }))
+                      }
+                    />
+                  ) : null}
+                  <TimingField
+                    label="Setup time"
+                    type="time"
+                    value={timing.setupTime}
+                    onChange={(value) =>
+                      setTiming((current) => ({ ...current, setupTime: value }))
+                    }
+                  />
+                  <TimingField
+                    label="Teardown time"
+                    type="time"
+                    value={timing.teardownTime}
+                    onChange={(value) =>
+                      setTiming((current) => ({ ...current, teardownTime: value }))
+                    }
+                  />
+                </div>
+              ) : null}
+            </StepCard>
           ) : null}
 
           {step === 3 ? (
-            <StepShell
+            <StepCard
               eyebrow="Step 4"
               title="Where is it?"
               body="Location keeps venue and vendor recommendations realistic."
@@ -325,17 +376,18 @@ export function EventWizard() {
                   className="mt-5 h-12 w-full rounded-lg border border-neutral-300 px-4 text-sm font-semibold outline-none transition focus:border-neutral-950"
                 />
               ) : null}
-            </StepShell>
+            </StepCard>
           ) : null}
 
           {step === 4 ? (
-            <StepShell
+            <StepCard
               eyebrow="Step 5"
               title="Guest count and budget."
               body="This helps Arivio avoid vendors that are too small, too large, or badly priced."
               action={<PrimaryButton label="Build recommendations" onClick={() => setStep(5)} />}
             >
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-5">
+                <div className="grid gap-4 md:grid-cols-2">
                 <TimingField
                   label="Guest count"
                   type="number"
@@ -348,12 +400,43 @@ export function EventWizard() {
                   value={String(budget)}
                   onChange={(value) => setBudget(Number(value))}
                 />
+                </div>
+                <div className="grid gap-2 sm:grid-cols-4">
+                  {[
+                    ["Simple", 2500],
+                    ["Standard", 6000],
+                    ["Premium", 15000],
+                    ["Luxury", 30000],
+                  ].map(([label, value]) => (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => setBudget(Number(value))}
+                      className={`h-12 rounded-full border text-sm font-semibold transition ${
+                        budget === Number(value)
+                          ? "border-neutral-950 bg-neutral-950 text-white"
+                          : "border-neutral-200 bg-white text-neutral-700 hover:border-neutral-950"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="range"
+                  min="500"
+                  max="50000"
+                  step="500"
+                  value={budget}
+                  onChange={(event) => setBudget(Number(event.target.value))}
+                  className="w-full accent-neutral-950"
+                />
               </div>
-            </StepShell>
+            </StepCard>
           ) : null}
 
           {step === 5 ? (
-            <StepShell
+            <StepCard
               eyebrow="Step 6"
               title="Smart recommendations."
               body={providerMessage}
@@ -407,7 +490,7 @@ export function EventWizard() {
                   quoteContext={quoteContext}
                 />
               </div>
-            </StepShell>
+            </StepCard>
           ) : null}
         </div>
 
@@ -447,38 +530,6 @@ function StepRail({ currentStep }: { currentStep: number }) {
   );
 }
 
-function StepShell({
-  action,
-  body,
-  children,
-  eyebrow,
-  title,
-}: {
-  action: ReactNode;
-  body: string;
-  children: ReactNode;
-  eyebrow: string;
-  title: string;
-}) {
-  return (
-    <div className="grid gap-8 p-6 sm:p-8 lg:grid-cols-[0.72fr_1.28fr] lg:p-10">
-      <div className="flex flex-col justify-between gap-8">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#e24b44]">
-            {eyebrow}
-          </p>
-          <h1 className="mt-4 text-3xl font-semibold tracking-tight text-neutral-950 sm:text-5xl">
-            {title}
-          </h1>
-          <p className="mt-4 text-base leading-7 text-neutral-600">{body}</p>
-        </div>
-        <div>{action}</div>
-      </div>
-      <div className="min-w-0">{children}</div>
-    </div>
-  );
-}
-
 function SearchBox({
   onChange,
   onSelect,
@@ -501,7 +552,7 @@ function SearchBox({
       <div className="mt-4 overflow-hidden rounded-[28px] border border-neutral-200 bg-[#fbfbfa] p-2">
         {suggestions.map((suggestion) => (
           <button
-            key={`${suggestion.label}-${suggestion.recognition.profile.id}`}
+            key={suggestion.label}
             type="button"
             onClick={() => onSelect(suggestion.label)}
             className="flex w-full items-center justify-between gap-4 rounded-[22px] px-4 py-3 text-left transition hover:bg-white"
@@ -511,11 +562,12 @@ function SearchBox({
                 {suggestion.label}
               </span>
               <span className="mt-1 block text-xs font-medium text-neutral-500">
-                {suggestion.recognition.profile.eventFamily ?? suggestion.recognition.profile.primaryType}
+                {suggestion.recognition.profile.likelyVibe ??
+                  suggestion.recognition.profile.venueStyle}
               </span>
             </span>
             <span className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-semibold text-neutral-700">
-              {Math.round(suggestion.recognition.confidence * 100)}%
+              Select
             </span>
           </button>
         ))}
@@ -524,64 +576,138 @@ function SearchBox({
   );
 }
 
+function PlainDetail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-white p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-neutral-400">
+        {label}
+      </p>
+      <p className="mt-1 text-sm font-semibold capitalize text-neutral-950">{value}</p>
+    </div>
+  );
+}
+
+function ReadonlyInput({ label, value }: { label: string; value: string }) {
+  return (
+    <label className="text-sm font-semibold text-neutral-800">
+      {label}
+      <input
+        value={value}
+        readOnly
+        className="mt-2 h-12 w-full rounded-2xl border border-neutral-200 bg-[#fbfbfa] px-4 text-sm font-semibold text-neutral-700"
+      />
+    </label>
+  );
+}
+
 function UnderstandingCard({
   customNote,
   onCustomNoteChange,
+  onAddService,
+  onToggleService,
   recognition,
+  selectedServices,
 }: {
   customNote: string;
+  onAddService: (service: ServiceName) => void;
   onCustomNoteChange: (value: string) => void;
+  onToggleService: (service: ServiceName) => void;
   recognition: ReturnType<typeof recognizeEventIntent>;
+  selectedServices: ServiceName[];
 }) {
   const profile = recognition.profile;
-  const details = [
-    ["Event family", profile.eventFamily ?? profile.primaryType],
-    ["Subtype", recognition.preservedSubtype ?? profile.subtype ?? "General"],
-    ["Likely vibe", profile.likelyVibe ?? profile.formality],
-    ["Culture", profile.culture ?? "Not detected"],
-    ["Religion", profile.religion ?? "Not detected"],
-    ["Indoor/outdoor", profile.indoorOutdoor],
-    ["Guest type", profile.likelyGuestType ?? "Guests"],
-    ["Age context", profile.ageContext ?? "Not assumed"],
-  ];
+  const [isEditing, setIsEditing] = useState(false);
+  const [serviceSearch, setServiceSearch] = useState("");
+  const visibleServices = selectedServices.filter(
+    (service) => !recognition.excludedServices.includes(service),
+  );
+  const addableServices = allServices.filter(
+    (service) =>
+      !visibleServices.includes(service) &&
+      !recognition.excludedServices.includes(service) &&
+      (!serviceSearch ||
+        service.toLowerCase().includes(serviceSearch.trim().toLowerCase())),
+  );
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-2">
-        {details.map(([label, value]) => (
-          <div key={label} className="rounded-lg border border-neutral-200 bg-[#fbfbfa] p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-neutral-500">
-              {label}
-            </p>
-            <p className="mt-2 text-sm font-semibold capitalize text-neutral-950">
-              {value}
-            </p>
-          </div>
-        ))}
+      <div className="rounded-[28px] border border-neutral-200 bg-[#fbfbfa] p-5">
+        <p className="text-sm font-semibold text-neutral-500">You are planning</p>
+        <h2 className="mt-2 text-3xl font-semibold tracking-tight text-neutral-950">
+          {recognition.preservedSubtype ?? profile.subtype ?? profile.primaryType}
+        </h2>
+        <p className="mt-3 text-base leading-7 text-neutral-600">
+          {getConfirmationBody(recognition)}
+        </p>
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <PlainDetail label="Style" value={profile.culture ?? profile.likelyVibe ?? "Flexible"} />
+          <PlainDetail label="Setting" value={profile.indoorOutdoor} />
+          <PlainDetail label="Vibe" value={profile.likelyVibe ?? "Guided"} />
+          <PlainDetail label="Guests" value={profile.likelyGuestType ?? "Your guests"} />
+        </div>
       </div>
 
-      <div className="rounded-lg border border-neutral-200 p-4">
-        <p className="text-sm font-semibold text-neutral-950">Likely needs</p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {(profile.likelyNeeds ?? recognition.recommendedServices).slice(0, 9).map((need) => (
-            <span
-              key={need}
-              className="rounded-full bg-[#fff5f5] px-3 py-1 text-xs font-semibold text-[#c33d38]"
-            >
-              {need}
-            </span>
+      <div className="rounded-[28px] border border-neutral-200 p-5">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-neutral-950">
+              We will help you find
+            </p>
+            <p className="mt-1 text-sm text-neutral-600">
+              Remove anything you do not need.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsEditing((current) => !current)}
+            className="rounded-full border border-neutral-200 px-4 py-2 text-sm font-semibold text-neutral-700 transition hover:border-neutral-950"
+          >
+            {isEditing ? "Done" : "Edit details"}
+          </button>
+        </div>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          {visibleServices.map((service) => (
+            <ServiceRecommendationCard
+              key={service}
+              service={service}
+              isSelected
+              onToggle={onToggleService}
+            />
           ))}
         </div>
       </div>
 
-      {recognition.suggestedClarifyingQuestions.length ? (
-        <div className="rounded-lg bg-neutral-950 p-4 text-white">
-          <p className="text-sm font-semibold">Questions Arivio will ask later</p>
-          <ul className="mt-3 space-y-2 text-sm text-neutral-300">
-            {recognition.suggestedClarifyingQuestions.map((question) => (
-              <li key={question}>{question}</li>
+      {isEditing ? (
+        <div className="rounded-[28px] border border-neutral-200 bg-white p-5 shadow-[0_18px_50px_rgba(20,20,20,0.06)]">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <ReadonlyInput label="Event type" value={profile.primaryType} />
+            <ReadonlyInput
+              label="Subtype"
+              value={recognition.preservedSubtype ?? profile.subtype ?? "General"}
+            />
+            <ReadonlyInput label="Culture or style" value={profile.culture ?? "Flexible"} />
+            <ReadonlyInput label="Indoor or outdoor" value={profile.indoorOutdoor} />
+            <ReadonlyInput label="Vibe" value={profile.likelyVibe ?? "Flexible"} />
+          </div>
+          <label className="mt-5 block text-sm font-semibold text-neutral-800">
+            Add a service
+            <input
+              value={serviceSearch}
+              onChange={(event) => setServiceSearch(event.target.value)}
+              placeholder="Search services"
+              className="mt-2 h-12 w-full rounded-2xl border border-neutral-300 px-4 text-sm font-semibold outline-none transition focus:border-neutral-950"
+            />
+          </label>
+          <div className="mt-3 grid max-h-56 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
+            {addableServices.slice(0, 8).map((service) => (
+              <ServiceRecommendationCard
+                key={service}
+                service={service}
+                isSelected={false}
+                onToggle={onAddService}
+              />
             ))}
-          </ul>
+          </div>
         </div>
       ) : null}
 
@@ -743,6 +869,56 @@ function RecommendationGroup({
       )}
     </div>
   );
+}
+
+function getConfirmationTitle(recognition: ReturnType<typeof recognizeEventIntent>) {
+  const label =
+    recognition.preservedSubtype ??
+    recognition.profile.subtype ??
+    recognition.profile.primaryType.toLowerCase();
+
+  return `Looks like ${startsWithVowel(label) ? "an" : "a"} ${label}.`;
+}
+
+function getConfirmationBody(recognition: ReturnType<typeof recognizeEventIntent>) {
+  const profile = recognition.profile;
+  const services = toFriendlyNeeds(profile.likelyNeeds ?? recognition.recommendedServices);
+
+  if (profile.id === "pool-party") {
+    return "We will include rentals, food, drinks, shade, lighting, cleaning, and optional lifeguards.";
+  }
+
+  if (profile.id === "bachelor-party") {
+    return "We will include venues, transportation, food and drinks, entertainment, and late-night options.";
+  }
+
+  if (profile.id === "funeral") {
+    return "We will focus on venues, catering, flowers, printed programs, transportation, and livestreaming.";
+  }
+
+  if (
+    (recognition.preservedSubtype ?? profile.subtype ?? "")
+      .toLowerCase()
+      .includes("sweet")
+  ) {
+    return "We will include DJ, cake, decor, photo booth, photographer, and rentals.";
+  }
+
+  return `We will help you find ${services}.`;
+}
+
+function toFriendlyNeeds(needs: string[]) {
+  const visibleNeeds = needs.slice(0, 7).map((need) => need.toLowerCase());
+
+  if (visibleNeeds.length <= 1) {
+    return visibleNeeds[0] ?? "the right vendors";
+  }
+
+  return `${visibleNeeds.slice(0, -1).join(", ")}, and ${visibleNeeds.at(-1)}`;
+}
+
+function startsWithVowel(value: string) {
+  return /^[aeiou]/i.test(value.trim());
 }
 
 function uniqueServices(services: ServiceName[]) {
