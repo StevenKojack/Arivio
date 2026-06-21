@@ -11,10 +11,10 @@ export function MarketplacePreview() {
         <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#e24b44]">
-              Marketplace
+              Vendor categories
             </p>
             <h2 className="mt-4 max-w-2xl text-3xl font-semibold tracking-tight text-neutral-950 sm:text-4xl">
-              Curated spaces and services for every part of the plan.
+              Venues, food, entertainment, rentals, production, and support in one flow.
             </h2>
           </div>
           <Link

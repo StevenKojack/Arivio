@@ -18,7 +18,7 @@ export function Hero() {
           <div className="mt-9 flex flex-col gap-4 sm:flex-row sm:items-center">
             <Link
               id="start"
-              href="/plan"
+              href="/discover"
               className="inline-flex h-[52px] items-center justify-center rounded-full bg-[#ff5a5f] px-7 text-base font-semibold text-white shadow-[0_16px_32px_rgba(255,90,95,0.28)] transition hover:bg-[#e84f54] focus:outline-none focus:ring-4 focus:ring-[#ff5a5f]/25"
             >
               Start Planning

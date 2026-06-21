@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { eventExamples } from "@/lib/event-intelligence/taxonomy";
 import { searchEventIntents } from "@/lib/event-intelligence/search";
 
+const loopExamples = [...eventExamples.slice(0, 18), ...eventExamples.slice(0, 18)];
+
 export function EventDiscoverySearch() {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -44,7 +46,7 @@ export function EventDiscoverySearch() {
             type="submit"
             className="h-12 rounded-full bg-neutral-950 px-5 text-sm font-semibold text-white shadow-[0_14px_34px_rgba(20,20,20,0.18)] transition hover:-translate-y-0.5 hover:bg-neutral-800 sm:px-7"
           >
-            Start
+            Plan my event
           </button>
         </div>
 
@@ -75,17 +77,19 @@ export function EventDiscoverySearch() {
         ) : null}
       </form>
 
-      <div className="mt-5 flex flex-wrap justify-center gap-2">
-        {eventExamples.slice(1, 7).map((example) => (
-          <button
-            key={example}
-            type="button"
-            onClick={() => submitSearch(example)}
-            className="rounded-full border border-neutral-200 bg-white/70 px-4 py-2 text-sm font-semibold text-neutral-700 backdrop-blur transition hover:border-neutral-950 hover:text-neutral-950"
-          >
-            {example}
-          </button>
-        ))}
+      <div className="mt-6 overflow-hidden [mask-image:linear-gradient(90deg,transparent,black_12%,black_88%,transparent)]">
+        <div className="flex w-max animate-[eventLoop_34s_linear_infinite] gap-2">
+          {loopExamples.map((example, index) => (
+            <button
+              key={`${example}-${index}`}
+              type="button"
+              onClick={() => submitSearch(example)}
+              className="rounded-full border border-neutral-200 bg-white/70 px-4 py-2 text-sm font-semibold text-neutral-700 backdrop-blur transition hover:border-neutral-950 hover:text-neutral-950"
+            >
+              {example}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,11 @@
+import Link from "next/link";
+import { CategorySection } from "./components/CategorySection";
 import { Footer } from "./components/Footer";
 import { EventDiscoverySearch } from "./components/EventDiscoverySearch";
+import { HowItWorks } from "./components/HowItWorks";
+import { MarketplacePreview } from "./components/MarketplacePreview";
 import { Navigation } from "./components/Navigation";
+import { TrustSection } from "./components/TrustSection";
 
 export default function Home() {
   return (
@@ -22,6 +27,32 @@ export default function Home() {
           <div className="mt-10 w-full animate-[fadeUp_360ms_ease-out]">
             <EventDiscoverySearch />
           </div>
+        </div>
+      </section>
+      <HowItWorks />
+      <CategorySection />
+      <MarketplacePreview />
+      <TrustSection />
+      <section className="bg-white px-6 py-20 sm:px-8 lg:px-12">
+        <div className="mx-auto flex max-w-7xl flex-col gap-6 rounded-lg border border-neutral-200 bg-[#f7f7f5] p-8 sm:p-10 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#e24b44]">
+              Providers
+            </p>
+            <h2 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight text-neutral-950 sm:text-4xl">
+              Bring your service into the Arivio network.
+            </h2>
+            <p className="mt-3 max-w-xl text-base leading-7 text-neutral-600">
+              Venues, caterers, entertainers, rental teams, florists, and event
+              specialists can receive clearer quote requests from real plans.
+            </p>
+          </div>
+          <Link
+            href="/vendor/onboarding"
+            className="inline-flex h-12 w-fit items-center justify-center rounded-full bg-neutral-950 px-6 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-neutral-800"
+          >
+            List your service
+          </Link>
         </div>
       </section>
       <Footer />

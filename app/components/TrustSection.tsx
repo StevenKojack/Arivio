@@ -1,7 +1,7 @@
 const stats = [
-  ["10", "event categories"],
-  ["5", "service types"],
-  ["1", "shared plan"],
+  ["1", "guided intake"],
+  ["4", "recommendation groups"],
+  ["0", "duplicate planning flows"],
 ];
 
 export function TrustSection() {
@@ -13,7 +13,7 @@ export function TrustSection() {
             Built for planners and providers
           </p>
           <h2 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">
-            A calmer way to bring people, places, and services together.
+            Why hosts use Arivio: less guessing, clearer timing, better vendor fit.
           </h2>
         </div>
         <div className="grid gap-4 sm:grid-cols-3">

@@ -31,6 +31,7 @@ export function rankMarketplaceItems(
   context: RecommendationContext,
 ) {
   return items
+    .filter((item) => !recognition.excludedServices.includes(item.type))
     .map((item) => ({
       item,
       match: scoreVendorForEvent(item, recognition, context),

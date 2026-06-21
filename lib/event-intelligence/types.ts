@@ -7,13 +7,19 @@ export type TimeOfDay = "morning" | "afternoon" | "evening" | "late-night";
 
 export type EventTaxonomyProfile = {
   aliases: string[];
+  ageContext?: string;
   budgetTier: BudgetTier;
   culture?: string;
   description: string;
+  eventFamily?: string;
+  excludedServices?: ServiceName[];
   formality: Formality;
   guestSize: string;
   id: string;
   indoorOutdoor: IndoorOutdoor;
+  likelyGuestType?: string;
+  likelyNeeds?: string[];
+  likelyVibe?: string;
   luxuryAddOns: ServiceName[];
   marketplaceEventType?: EventType;
   optionalVendors: ServiceName[];
@@ -34,6 +40,9 @@ export type EventRecognition = {
   normalizedQuery: string;
   profile: EventTaxonomyProfile;
   preservedSubtype?: string;
+  recommendedServices: ServiceName[];
+  excludedServices: ServiceName[];
+  suggestedClarifyingQuestions: string[];
   tags: string[];
 };
 

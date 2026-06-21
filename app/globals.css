@@ -33,3 +33,13 @@ html {
     transform: translateY(0);
   }
 }
+
+@keyframes eventLoop {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}

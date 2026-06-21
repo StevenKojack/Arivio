@@ -160,7 +160,7 @@ export function AccountDashboard() {
         </div>
         <div className="flex flex-wrap gap-3">
           <Link
-            href="/plan"
+            href="/discover"
             className="rounded-full bg-[#ff5a5f] px-5 py-3 text-sm font-semibold text-white"
           >
             New event
@@ -241,7 +241,7 @@ export function AccountDashboard() {
               ))
             ) : (
               <EmptyState
-                actionHref="/plan"
+                actionHref="/discover"
                 actionLabel="Create event"
                 message="No upcoming events yet."
               />
@@ -373,7 +373,7 @@ export function AccountDashboard() {
               ))
             ) : (
               <EmptyState
-                actionHref="/plan"
+                actionHref="/discover"
                 actionLabel="Create event"
                 message="Guest lists appear after you create an event."
               />
@@ -383,8 +383,8 @@ export function AccountDashboard() {
       </div>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-3">
-        <QuickAction title="Resume planning" href={events[0] ? `/events/${events[0].id}` : "/plan"} />
-        <QuickAction title="Manage guests" href={events[0] ? `/events/${events[0].id}` : "/plan"} />
+        <QuickAction title="Resume planning" href={events[0] ? `/events/${events[0].id}` : "/discover"} />
+        <QuickAction title="Manage guests" href={events[0] ? `/events/${events[0].id}` : "/discover"} />
         <QuickAction title="View messages" href="/account" muted />
       </div>
 

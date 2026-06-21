@@ -24,7 +24,7 @@ export function Footer() {
           <Link className="transition hover:text-white" href="/">
             Home
           </Link>
-          <Link className="transition hover:text-white" href="/plan">
+          <Link className="transition hover:text-white" href="/discover">
             Start Planning
           </Link>
         </div>

@@ -16,9 +16,7 @@ type SessionNavState = {
 };
 
 const centerLinks = [
-  { href: "/account", label: "Events" },
   { href: "/marketplace", label: "Marketplace" },
-  { href: "/plan", label: "Plan" },
 ];
 
 export function Navigation() {
@@ -162,7 +160,10 @@ export function Navigation() {
 
       {mobileOpen ? (
         <div className="mx-auto grid max-w-7xl gap-2 border-t border-neutral-100 py-4 md:hidden">
-          {[...centerLinks, { href: "/vendor/onboarding", label: "List your service" }]
+          {[
+            ...centerLinks,
+            { href: "/vendor/onboarding", label: "List your service" },
+          ]
             .map((item) => (
               <Link
                 key={item.href}

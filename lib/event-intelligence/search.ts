@@ -3,6 +3,7 @@ import {
   eventTaxonomyProfiles,
   getDefaultProfile,
 } from "./taxonomy";
+import type { ServiceName } from "@/app/data/marketplace";
 import type { EventRecognition, EventTaxonomyProfile } from "./types";
 
 const synonymFamilies = [
@@ -33,10 +34,17 @@ export function recognizeEventIntent(query: string): EventRecognition {
   const best = matches[0];
   const profile = best?.profile ?? getDefaultProfile();
   const preservedSubtype = inferSubtype(query, profile);
+  const recommendedServices = getRecommendedServices(profile, normalizedQuery);
+  const excludedServices = getExcludedServices(profile, normalizedQuery);
   const tags = Array.from(
     new Set([
       profile.id,
+      profile.eventFamily ?? "",
       normalizeSearchText(profile.primaryType),
+      normalizeSearchText(profile.subtype ?? ""),
+      normalizeSearchText(profile.culture ?? ""),
+      normalizeSearchText(profile.religion ?? ""),
+      normalizeSearchText(profile.ageContext ?? ""),
       ...profile.recommendedTags,
       ...expandSynonyms(normalizedQuery),
       ...(preservedSubtype ? [normalizeSearchText(preservedSubtype)] : []),
@@ -47,8 +55,11 @@ export function recognizeEventIntent(query: string): EventRecognition {
     confidence: best?.score ?? 0.35,
     matchedAlias: best?.matchedAlias ?? profile.aliases[0],
     normalizedQuery,
+    recommendedServices,
+    excludedServices,
     preservedSubtype,
     profile,
+    suggestedClarifyingQuestions: getClarifyingQuestions(profile, normalizedQuery),
     tags,
   };
 }
@@ -71,24 +82,13 @@ export function searchEventIntents(query: string, limit = 7) {
     .slice(0, limit)
     .map((match) => ({
       label: buildSuggestionLabel(match.profile, query),
-      recognition: {
-        confidence: match.score,
-        matchedAlias: match.matchedAlias,
-        normalizedQuery,
-        preservedSubtype: inferSubtype(query, match.profile),
-        profile: match.profile,
-        tags: Array.from(
-          new Set([
-            match.profile.id,
-            ...match.profile.recommendedTags,
-            ...expandSynonyms(normalizedQuery),
-          ]),
-        ),
-      },
+      recognition: recognizeEventIntent(match.matchedAlias),
     }));
 }
 
 function scoreProfiles(normalizedQuery: string) {
+  const forcedProfileId = detectForcedProfileId(normalizedQuery);
+
   return eventTaxonomyProfiles
     .map((profile) => {
       const aliases = [
@@ -112,10 +112,41 @@ function scoreProfiles(normalizedQuery: string) {
       return {
         matchedAlias: bestAlias?.alias ?? profile.aliases[0],
         profile,
-        score: Math.max(bestAlias?.score ?? 0, synonymScore),
+        score:
+          forcedProfileId === profile.id
+            ? 1.1
+            : Math.max(bestAlias?.score ?? 0, synonymScore),
       };
     })
     .sort((a, b) => b.score - a.score);
+}
+
+function detectForcedProfileId(query: string) {
+  if (["funeral", "memorial", "wake", "repass", "celebration of life"].some((term) => query.includes(term))) {
+    return "funeral";
+  }
+
+  if (query.includes("pool party") || query.includes("pool event")) {
+    return "pool-party";
+  }
+
+  if (query.includes("bachelor") || query.includes("bachelorette")) {
+    return "bachelor-party";
+  }
+
+  if (query.includes("quince")) {
+    return "quinceanera";
+  }
+
+  if (query.includes("mitzvah")) {
+    return "mitzvah";
+  }
+
+  if (query.includes("trade show") || query.includes("seminar") || query.includes("conference")) {
+    return "conference";
+  }
+
+  return undefined;
 }
 
 function scoreAlias(query: string, alias: string) {
@@ -178,6 +209,72 @@ function buildSuggestionLabel(profile: EventTaxonomyProfile, query: string) {
   return profile.subtype
     ? `${profile.primaryType}: ${profile.subtype}`
     : profile.primaryType;
+}
+
+function getRecommendedServices(
+  profile: EventTaxonomyProfile,
+  normalizedQuery: string,
+) {
+  const services = new Set<ServiceName>([
+    ...profile.requiredVendors,
+    ...profile.recommendedVendors,
+    ...profile.optionalVendors,
+  ]);
+
+  if (normalizedQuery.includes("kids birthday")) {
+    ["Character Performers", "Magic", "Cake & Desserts", "Rentals", "Photography"].forEach(
+      (service) => services.add(service as ServiceName),
+    );
+  }
+
+  return Array.from(services).filter(
+    (service) => !getExcludedServices(profile, normalizedQuery).includes(service),
+  );
+}
+
+function getExcludedServices(
+  profile: EventTaxonomyProfile,
+  normalizedQuery: string,
+) {
+  const excluded = new Set<ServiceName>(profile.excludedServices ?? []);
+
+  if (
+    profile.id === "funeral" ||
+    ["funeral", "memorial", "wake", "repass"].some((term) =>
+      normalizedQuery.includes(term),
+    )
+  ) {
+    ["DJ", "Magic", "Character Performers", "Photo Booth"].forEach((service) =>
+      excluded.add(service as ServiceName),
+    );
+  }
+
+  return Array.from(excluded);
+}
+
+function getClarifyingQuestions(
+  profile: EventTaxonomyProfile,
+  normalizedQuery: string,
+) {
+  const questions: string[] = [];
+
+  if (profile.id === "pool-party" && !normalizedQuery.includes("birthday")) {
+    questions.push("Is this also for a birthday or just a pool party?");
+  }
+
+  if (profile.indoorOutdoor === "indoor-outdoor") {
+    questions.push("Will this be indoors, outdoors, or both?");
+  }
+
+  if (!normalizedQuery.includes("home") && !normalizedQuery.includes("venue")) {
+    questions.push("Do you already have a location?");
+  }
+
+  if (profile.culture || profile.religion) {
+    questions.push("Are there cultural or religious requirements vendors should know?");
+  }
+
+  return questions.slice(0, 3);
 }
 
 function levenshteinDistance(left: string, right: string) {
