@@ -78,7 +78,7 @@ export function VendorDashboard() {
           return;
         }
 
-        const profile = await ensureCurrentProfile(supabase, user, "vendor");
+        const profile = await ensureCurrentProfile(supabase, user);
         const vendorRows = await getVendorBusinessesByOwner(supabase, profile.id);
         const vendorIds = vendorRows.map((vendor) => vendor.id);
         const [serviceRows, availabilityRows, photoRows, quoteRows, bookingRows] =

@@ -1,4 +1,4 @@
-export type UserRole = "planner" | "vendor" | "admin";
+export type UserRole = "planner" | "admin";
 
 export type ApprovalStatus = "pending" | "approved" | "rejected" | "suspended";
 

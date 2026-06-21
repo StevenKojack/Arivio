@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { isAdminEmail } from "@/lib/auth/roles";
 import { createBrowserSupabaseClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { getBookingsForPlannerEvents, type BookingRow } from "@/lib/repositories/bookingsRepository";
 import { getPlannerEvents } from "@/lib/repositories/eventsRepository";
@@ -21,6 +22,7 @@ export function AccountDashboard() {
   const [vendors, setVendors] = useState<VendorBusinessRow[]>([]);
   const [quoteRequests, setQuoteRequests] = useState<QuoteRequestRow[]>([]);
   const [bookings, setBookings] = useState<BookingRow[]>([]);
+  const [userEmail, setUserEmail] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState("");
 
@@ -45,6 +47,7 @@ export function AccountDashboard() {
           return;
         }
 
+        setUserEmail(user.email ?? "");
         const currentProfile = await ensureCurrentProfile(supabase, user);
         setProfile(currentProfile);
 
@@ -146,13 +149,13 @@ export function AccountDashboard() {
       <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#e24b44]">
-            Planner dashboard
+            Account
           </p>
           <h1 className="mt-4 text-4xl font-semibold tracking-tight sm:text-6xl">
             Welcome{profile?.full_name ? `, ${profile.full_name}` : ""}.
           </h1>
           <p className="mt-4 text-lg text-neutral-600">
-            Events, quote responses, vendors, and booking progress in one view.
+            Plan events, review quotes, manage guests, and confirm bookings.
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -168,12 +171,22 @@ export function AccountDashboard() {
           >
             Browse vendors
           </Link>
-          <Link
-            href="/vendor/dashboard"
-            className="rounded-full border border-neutral-300 px-5 py-3 text-sm font-semibold text-neutral-950"
-          >
-            Vendor dashboard
-          </Link>
+          {vendors.length ? (
+            <Link
+              href="/vendor/dashboard"
+              className="rounded-full border border-neutral-300 px-5 py-3 text-sm font-semibold text-neutral-950"
+            >
+              Vendor dashboard
+            </Link>
+          ) : null}
+          {isAdminEmail(userEmail) ? (
+            <Link
+              href="/admin"
+              className="rounded-full border border-neutral-300 px-5 py-3 text-sm font-semibold text-neutral-950"
+            >
+              Admin
+            </Link>
+          ) : null}
           <Link
             href="/auth/logout"
             className="rounded-full border border-neutral-300 px-5 py-3 text-sm font-semibold text-neutral-950"
@@ -199,7 +212,7 @@ export function AccountDashboard() {
       <div className="mt-5 grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
         <section className="rounded-lg border border-neutral-200 bg-white p-6 shadow-[0_18px_44px_rgba(20,20,20,0.05)]">
           <div className="flex items-center justify-between gap-4">
-            <h2 className="text-2xl font-semibold tracking-tight">Upcoming events</h2>
+          <h2 className="text-2xl font-semibold tracking-tight">My events</h2>
             <span className="rounded-full bg-neutral-100 px-3 py-1 text-xs font-semibold text-neutral-700">
               {draftEvents.length} drafts
             </span>
@@ -313,15 +326,84 @@ export function AccountDashboard() {
         </div>
       </section>
 
+      <div className="mt-5 grid gap-5 lg:grid-cols-2">
+        <section className="rounded-lg border border-neutral-200 bg-white p-6 shadow-[0_18px_44px_rgba(20,20,20,0.05)]">
+          <h2 className="text-2xl font-semibold tracking-tight">Bookings</h2>
+          <div className="mt-5 space-y-3">
+            {bookings.length ? (
+              bookings.map((booking) => (
+                <Link
+                  key={booking.id}
+                  href={`/bookings/${booking.id}`}
+                  className="block rounded-lg border border-neutral-200 p-4 transition hover:border-neutral-950"
+                >
+                  <p className="font-semibold text-neutral-950">
+                    {formatMoney(booking.final_price)} - {booking.booking_status}
+                  </p>
+                  <p className="mt-1 text-sm text-neutral-500">
+                    Payment {booking.payment_status}
+                  </p>
+                </Link>
+              ))
+            ) : (
+              <EmptyState
+                actionHref="/marketplace"
+                actionLabel="Request quotes"
+                message="No confirmed vendors yet."
+              />
+            )}
+          </div>
+        </section>
+
+        <section className="rounded-lg border border-neutral-200 bg-white p-6 shadow-[0_18px_44px_rgba(20,20,20,0.05)]">
+          <h2 className="text-2xl font-semibold tracking-tight">Guest lists</h2>
+          <div className="mt-5 space-y-3">
+            {events.length ? (
+              events.map((event) => (
+                <Link
+                  key={event.id}
+                  href={`/events/${event.id}`}
+                  className="block rounded-lg border border-neutral-200 p-4 transition hover:border-neutral-950"
+                >
+                  <p className="font-semibold text-neutral-950">{event.title}</p>
+                  <p className="mt-1 text-sm text-neutral-500">
+                    Manage guests and RSVP summary
+                  </p>
+                </Link>
+              ))
+            ) : (
+              <EmptyState
+                actionHref="/plan"
+                actionLabel="Create event"
+                message="Guest lists appear after you create an event."
+              />
+            )}
+          </div>
+        </section>
+      </div>
+
       <div className="mt-5 grid gap-5 lg:grid-cols-3">
         <QuickAction title="Resume planning" href={events[0] ? `/events/${events[0].id}` : "/plan"} />
         <QuickAction title="Manage guests" href={events[0] ? `/events/${events[0].id}` : "/plan"} />
         <QuickAction title="View messages" href="/account" muted />
       </div>
 
-      {vendors.length ? (
-        <section className="mt-5 rounded-lg border border-neutral-200 bg-white p-6">
-          <h2 className="text-2xl font-semibold tracking-tight">Your vendor listings</h2>
+      <section className="mt-5 rounded-lg border border-neutral-200 bg-white p-6">
+        <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight">Vendor tools</h2>
+            <p className="mt-1 text-sm text-neutral-500">
+              Vendor tools stay separate from planning until you list a service.
+            </p>
+          </div>
+          <Link
+            href={vendors.length ? "/vendor/dashboard" : "/vendor/onboarding"}
+            className="w-fit rounded-full bg-neutral-950 px-5 py-3 text-sm font-semibold text-white"
+          >
+            {vendors.length ? "Open vendor dashboard" : "Become a vendor"}
+          </Link>
+        </div>
+        {vendors.length ? (
           <div className="mt-5 grid gap-3 md:grid-cols-2">
             {vendors.map((vendor) => (
               <article key={vendor.id} className="rounded-lg border border-neutral-200 p-4">
@@ -332,8 +414,8 @@ export function AccountDashboard() {
               </article>
             ))}
           </div>
-        </section>
-      ) : null}
+        ) : null}
+      </section>
     </div>
   );
 }

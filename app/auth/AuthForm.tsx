@@ -1,29 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { createBrowserSupabaseClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { upsertProfile } from "@/lib/repositories/profilesRepository";
-import type { UserRole } from "@/lib/types/domain";
 
 type AuthFormProps = {
   mode: "login" | "signup";
 };
 
-const roles: Array<{ label: string; value: UserRole }> = [
-  { label: "Planner", value: "planner" },
-  { label: "Vendor", value: "vendor" },
-  { label: "Admin", value: "admin" },
-];
-
 export function AuthForm({ mode }: AuthFormProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextPath = searchParams.get("next") ?? "/account";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [role, setRole] = useState<UserRole>("planner");
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -53,7 +46,6 @@ export function AuthForm({ mode }: AuthFormProps) {
           options: {
             data: {
               full_name: fullName,
-              role,
             },
           },
         });
@@ -62,17 +54,17 @@ export function AuthForm({ mode }: AuthFormProps) {
           throw signUpError;
         }
 
-        if (data.user) {
+        if (data.user && data.session) {
           await upsertProfile(supabase, {
             email,
             fullName: fullName || null,
-            phone: phone || null,
-            role,
             userId: data.user.id,
           });
-          setStatus("Account created. You can continue to your dashboard.");
         }
 
+        setStatus(
+          "Check your email to confirm your account. After confirming, return to Arivio and log in.",
+        );
         router.refresh();
         return;
       }
@@ -86,13 +78,13 @@ export function AuthForm({ mode }: AuthFormProps) {
         throw signInError;
       }
 
-      router.push("/account");
+      router.push(nextPath);
       router.refresh();
     } catch (authError) {
       setError(
         authError instanceof Error
           ? authError.message
-          : "Something went wrong with authentication.",
+          : "We could not complete that request. Please try again.",
       );
     } finally {
       setIsSubmitting(false);
@@ -138,44 +130,6 @@ export function AuthForm({ mode }: AuthFormProps) {
           placeholder="At least 6 characters"
         />
       </label>
-      {isSignup ? (
-        <>
-          <label className="grid gap-2 text-sm font-semibold text-neutral-800">
-            Phone
-            <input
-              value={phone}
-              onChange={(event) => setPhone(event.target.value)}
-              className="h-12 rounded-lg border border-neutral-300 px-4 text-sm outline-none focus:border-neutral-950"
-              placeholder="Optional"
-            />
-          </label>
-          <fieldset className="grid gap-3">
-            <legend className="text-sm font-semibold text-neutral-800">
-              Account type
-            </legend>
-            <div className="grid gap-2 sm:grid-cols-3">
-              {roles.map((item) => (
-                <label
-                  key={item.value}
-                  className={`cursor-pointer rounded-lg border p-4 text-sm font-semibold transition ${
-                    role === item.value
-                      ? "border-neutral-950 bg-neutral-950 text-white"
-                      : "border-neutral-200 bg-white text-neutral-700 hover:border-neutral-950"
-                  }`}
-                >
-                  <input
-                    className="sr-only"
-                    type="radio"
-                    checked={role === item.value}
-                    onChange={() => setRole(item.value)}
-                  />
-                  {item.label}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-        </>
-      ) : null}
       {error ? (
         <p className="rounded-lg bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
           {error}
@@ -192,6 +146,14 @@ export function AuthForm({ mode }: AuthFormProps) {
       >
         {isSubmitting ? "Working..." : isSignup ? "Create account" : "Log in"}
       </button>
+      {!isSignup ? (
+        <Link
+          href="/auth/login"
+          className="text-center text-sm font-semibold text-neutral-500"
+        >
+          Forgot password?
+        </Link>
+      ) : null}
       <p className="text-center text-sm text-neutral-500">
         {isSignup ? "Already have an account?" : "New to Arivio?"}{" "}
         <Link

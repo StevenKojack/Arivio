@@ -152,7 +152,7 @@ export function PlannerForm() {
         return;
       }
 
-      const profile = await ensureCurrentProfile(supabase, user, "planner");
+      const profile = await ensureCurrentProfile(supabase, user);
       requireString(title || `${eventType} event`, "Event title");
       requirePositiveNumber(guestCount, "Guest count");
       requirePositiveNumber(budget, "Budget");

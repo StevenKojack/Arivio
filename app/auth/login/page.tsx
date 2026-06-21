@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { AuthForm } from "../AuthForm";
 import { Footer } from "../../components/Footer";
 import { Navigation } from "../../components/Navigation";
@@ -14,7 +15,9 @@ export default function LoginPage() {
           <h1 className="mt-4 text-4xl font-semibold tracking-tight sm:text-6xl">
             Log in to Arivio.
           </h1>
-          <AuthForm mode="login" />
+          <Suspense fallback={<div className="mt-10 text-sm font-semibold text-neutral-500">Loading login...</div>}>
+            <AuthForm mode="login" />
+          </Suspense>
         </div>
       </section>
       <Footer />

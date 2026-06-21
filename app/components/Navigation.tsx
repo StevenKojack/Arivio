@@ -1,38 +1,180 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { isAdminEmail } from "@/lib/auth/roles";
+import { getCurrentProfile } from "@/lib/repositories/profilesRepository";
+import { getVendorBusinessesByOwner } from "@/lib/repositories/vendorsRepository";
+import { createBrowserSupabaseClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { Logo } from "./Logo";
 
-const navItems = [
-  { label: "Marketplace", href: "/marketplace" },
-  { label: "Plan", href: "/plan" },
-  { label: "Vendor", href: "/vendor/dashboard" },
-  { label: "Account", href: "/account" },
-  { label: "Admin", href: "/admin" },
-  { label: "Setup", href: "/setup" },
+type SessionNavState = {
+  email: string | null;
+  hasVendorProfile: boolean;
+  isAdmin: boolean;
+  isLoggedIn: boolean;
+};
+
+const centerLinks = [
+  { href: "/account", label: "Events" },
+  { href: "/marketplace", label: "Marketplace" },
+  { href: "/plan", label: "Plan" },
 ];
 
 export function Navigation() {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [navState, setNavState] = useState<SessionNavState>({
+    email: null,
+    hasVendorProfile: false,
+    isAdmin: false,
+    isLoggedIn: false,
+  });
+
+  useEffect(() => {
+    async function loadNavigationState() {
+      if (!hasSupabaseConfig()) {
+        return;
+      }
+
+      try {
+        const supabase = createBrowserSupabaseClient();
+        const { data: sessionData } = await supabase.auth.getSession();
+        const user = sessionData.session?.user;
+
+        if (!user) {
+          return;
+        }
+
+        const profile = await getCurrentProfile(supabase, user);
+        const vendorRows = profile
+          ? await getVendorBusinessesByOwner(supabase, profile.id)
+          : [];
+
+        setNavState({
+          email: user.email ?? null,
+          hasVendorProfile: vendorRows.length > 0,
+          isAdmin: isAdminEmail(user.email),
+          isLoggedIn: true,
+        });
+      } catch {
+        setNavState({
+          email: null,
+          hasVendorProfile: false,
+          isAdmin: false,
+          isLoggedIn: false,
+        });
+      }
+    }
+
+    loadNavigationState();
+  }, []);
+
+  const menuLinks = navState.isLoggedIn
+    ? [
+        { href: "/account", label: "Account", show: true },
+        { href: "/account", label: "My events", show: true },
+        {
+          href: "/vendor/dashboard",
+          label: "Vendor dashboard",
+          show: navState.hasVendorProfile,
+        },
+        { href: "/admin", label: "Admin", show: navState.isAdmin },
+        { href: "/auth/logout", label: "Log out", show: true },
+      ]
+    : [
+        { href: "/auth/login", label: "Log in", show: true },
+        { href: "/auth/signup", label: "Sign up", show: true },
+        { href: "/setup", label: "Help", show: true },
+      ];
+
   return (
-    <header className="sticky top-0 z-20 border-b border-black/5 bg-white/85 px-6 backdrop-blur-xl sm:px-8 lg:px-12">
-      <nav className="mx-auto flex h-[72px] max-w-7xl items-center justify-between">
+    <header className="sticky top-0 z-30 border-b border-black/5 bg-white/90 px-5 backdrop-blur-xl sm:px-8 lg:px-12">
+      <nav className="mx-auto flex h-[72px] max-w-7xl items-center justify-between gap-4">
         <Logo />
-        <div className="hidden items-center gap-8 text-sm font-medium text-neutral-600 md:flex">
-          {navItems.map((item) => (
+
+        <div className="hidden items-center rounded-full border border-neutral-200 bg-white p-1 text-sm font-semibold text-neutral-700 shadow-[0_10px_30px_rgba(20,20,20,0.05)] md:flex">
+          {centerLinks.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className="transition hover:text-neutral-950"
+              className="rounded-full px-5 py-2 transition hover:bg-neutral-100 hover:text-neutral-950"
             >
               {item.label}
             </Link>
           ))}
         </div>
-        <Link
-          href="/plan"
-          className="inline-flex h-10 items-center justify-center rounded-full border border-neutral-300 px-5 text-sm font-semibold text-neutral-950 transition hover:border-neutral-950"
-        >
-          Start Planning
-        </Link>
+
+        <div className="flex items-center gap-2">
+          <Link
+            href="/vendor/onboarding"
+            className="hidden rounded-full px-4 py-2 text-sm font-semibold text-neutral-800 transition hover:bg-neutral-100 md:inline-flex"
+          >
+            List your service
+          </Link>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setMenuOpen((current) => !current)}
+              className="inline-flex h-11 items-center gap-3 rounded-full border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-950 shadow-[0_10px_24px_rgba(20,20,20,0.06)] transition hover:shadow-[0_14px_30px_rgba(20,20,20,0.1)]"
+              aria-expanded={menuOpen}
+            >
+              <span className="grid gap-1">
+                <span className="h-0.5 w-4 rounded-full bg-neutral-800" />
+                <span className="h-0.5 w-4 rounded-full bg-neutral-800" />
+                <span className="h-0.5 w-4 rounded-full bg-neutral-800" />
+              </span>
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-neutral-950 text-xs font-semibold text-white">
+                {navState.email?.[0]?.toUpperCase() ?? "A"}
+              </span>
+            </button>
+            {menuOpen ? (
+              <div className="absolute right-0 mt-3 w-64 overflow-hidden rounded-xl border border-neutral-200 bg-white py-2 shadow-[0_24px_70px_rgba(20,20,20,0.14)]">
+                {navState.email ? (
+                  <p className="border-b border-neutral-100 px-4 py-3 text-xs font-semibold text-neutral-500">
+                    {navState.email}
+                  </p>
+                ) : null}
+                {menuLinks
+                  .filter((item) => item.show)
+                  .map((item) => (
+                    <Link
+                      key={`${item.href}-${item.label}`}
+                      href={item.href}
+                      onClick={() => setMenuOpen(false)}
+                      className="block px-4 py-3 text-sm font-semibold text-neutral-700 transition hover:bg-neutral-50 hover:text-neutral-950"
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+              </div>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            onClick={() => setMobileOpen((current) => !current)}
+            className="inline-flex h-11 items-center rounded-full border border-neutral-300 px-4 text-sm font-semibold text-neutral-950 md:hidden"
+          >
+            Menu
+          </button>
+        </div>
       </nav>
+
+      {mobileOpen ? (
+        <div className="mx-auto grid max-w-7xl gap-2 border-t border-neutral-100 py-4 md:hidden">
+          {[...centerLinks, { href: "/vendor/onboarding", label: "List your service" }]
+            .map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setMobileOpen(false)}
+                className="rounded-lg px-3 py-3 text-sm font-semibold text-neutral-800 hover:bg-neutral-100"
+              >
+                {item.label}
+              </Link>
+            ))}
+        </div>
+      ) : null}
     </header>
   );
 }

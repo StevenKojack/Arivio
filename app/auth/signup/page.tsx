@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { AuthForm } from "../AuthForm";
 import { Footer } from "../../components/Footer";
 import { Navigation } from "../../components/Navigation";
@@ -12,9 +13,14 @@ export default function SignupPage() {
             Create account
           </p>
           <h1 className="mt-4 text-4xl font-semibold tracking-tight sm:text-6xl">
-            Start planning or list your services.
+            Create your Arivio account.
           </h1>
-          <AuthForm mode="signup" />
+          <p className="mx-auto mt-4 max-w-2xl text-lg text-neutral-600">
+            Start as a planner. You can list services later from your account.
+          </p>
+          <Suspense fallback={<div className="mt-10 text-sm font-semibold text-neutral-500">Loading signup...</div>}>
+            <AuthForm mode="signup" />
+          </Suspense>
         </div>
       </section>
       <Footer />

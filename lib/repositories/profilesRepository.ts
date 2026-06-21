@@ -1,6 +1,6 @@
 import type { User } from "@supabase/supabase-js";
 import type { PublicTableRow } from "@/lib/supabase/database.types";
-import type { UserRole } from "@/lib/types/domain";
+import { profileRoleForEmail } from "@/lib/auth/roles";
 import type { ArivioSupabaseClient } from "./types";
 
 export async function getCurrentProfile(
@@ -26,7 +26,6 @@ export async function upsertProfile(
     email: string;
     fullName?: string | null;
     phone?: string | null;
-    role: UserRole;
     userId: string;
   },
 ) {
@@ -36,7 +35,7 @@ export async function upsertProfile(
       email: input.email,
       full_name: input.fullName ?? null,
       phone: input.phone ?? null,
-      role: input.role,
+      role: profileRoleForEmail(input.email),
       user_id: input.userId,
     })
     .select("*")
@@ -52,7 +51,6 @@ export async function upsertProfile(
 export async function ensureCurrentProfile(
   supabase: ArivioSupabaseClient,
   user: User,
-  role: UserRole = "planner",
 ): Promise<PublicTableRow<"profiles">> {
   const existingProfile = await getCurrentProfile(supabase, user);
 
@@ -64,16 +62,10 @@ export async function ensureCurrentProfile(
     typeof user.user_metadata.full_name === "string"
       ? user.user_metadata.full_name
       : null;
-  const profileRole =
-    typeof user.user_metadata.role === "string"
-      ? (user.user_metadata.role as UserRole)
-      : role;
-
   return upsertProfile(supabase, {
     email: user.email ?? "",
     fullName,
     phone: null,
-    role: profileRole,
     userId: user.id,
   });
 }

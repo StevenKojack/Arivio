@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import Link from "next/link";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { allServices, eventTypes } from "../../data/marketplace";
 import { createBrowserSupabaseClient, hasSupabaseConfig } from "@/lib/supabase/client";
@@ -32,7 +33,25 @@ export function VendorOnboardingForm() {
     "Private Party",
   ]);
   const [error, setError] = useState("");
+  const [authNotice, setAuthNotice] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    async function checkSession() {
+      if (!hasSupabaseConfig()) {
+        return;
+      }
+
+      const supabase = createBrowserSupabaseClient();
+      const { data } = await supabase.auth.getSession();
+
+      if (!data.session?.user) {
+        setAuthNotice("Log in first, then continue listing your service.");
+      }
+    }
+
+    checkSession();
+  }, []);
 
   function toggleEventType(eventType: string) {
     setSelectedEventTypes((current) =>
@@ -59,11 +78,11 @@ export function VendorOnboardingForm() {
       const user = sessionData.session?.user;
 
       if (!user) {
-        router.push("/auth/login");
+        router.push("/auth/login?next=/vendor/onboarding");
         return;
       }
 
-      const profile = await ensureCurrentProfile(supabase, user, "vendor");
+      const profile = await ensureCurrentProfile(supabase, user);
       requireString(businessName, "Business name");
       requireString(serviceName, "Service name");
       requirePositiveNumber(radius, "Service radius");
@@ -265,6 +284,17 @@ export function VendorOnboardingForm() {
         <p className="rounded-lg bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
           {error}
         </p>
+      ) : null}
+      {authNotice ? (
+        <div className="rounded-lg border border-neutral-200 bg-[#fbfbfa] px-4 py-3 text-sm font-semibold text-neutral-700">
+          <p>{authNotice}</p>
+          <Link
+            href="/auth/login?next=/vendor/onboarding"
+            className="mt-3 inline-flex rounded-full bg-neutral-950 px-4 py-2 text-sm text-white"
+          >
+            Log in to continue
+          </Link>
+        </div>
       ) : null}
       <button
         disabled={isSubmitting}

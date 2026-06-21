@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { isAdminEmail } from "@/lib/auth/roles";
 import {
   getAdminOverview,
   updateVendorApprovalStatus,
 } from "@/lib/repositories/adminRepository";
-import { ensureCurrentProfile } from "@/lib/repositories/profilesRepository";
 import type { PublicTableRow } from "@/lib/supabase/database.types";
 import { createBrowserSupabaseClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { formatDate, formatMoney } from "@/lib/utils/format";
@@ -35,10 +35,8 @@ export function AdminDashboard() {
           return;
         }
 
-        const profile = await ensureCurrentProfile(supabase, user);
-
-        if (profile.role !== "admin") {
-          setMessage("This dashboard is only available to admin accounts.");
+        if (!isAdminEmail(user.email)) {
+          setMessage("Access denied. Admin tools are restricted.");
           return;
         }
 
