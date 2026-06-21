@@ -54,17 +54,30 @@ export type Database = {
           budget_max: number | null;
           budget_min: number | null;
           city: string | null;
+          budget_tier: string | null;
+          culture: string | null;
           date: string | null;
           end_time: string | null;
+          event_profile: Json | null;
           event_type: string;
+          formality: string | null;
           guest_count: number | null;
           id: string;
+          indoor_outdoor: string | null;
           latitude: number | null;
           longitude: number | null;
           planner_id: string;
+          religion: string | null;
+          season: string | null;
+          setup_time: string | null;
           start_time: string | null;
           status: EventStatus;
+          subtype: string | null;
+          teardown_time: string | null;
+          time_of_day: string | null;
+          timezone: string | null;
           title: string;
+          venue_style: string | null;
           venue_needed: boolean;
         };
         Insert: Partial<Database["public"]["Tables"]["events"]["Row"]> & {
@@ -287,6 +300,47 @@ export type Database = {
           name: string;
         };
         Update: Partial<Database["public"]["Tables"]["guests"]["Insert"]>;
+        Relationships: [];
+      };
+      vendor_tags: {
+        Row: RowWithTimestamps & {
+          id: string;
+          tag: string;
+          vendor_id: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["vendor_tags"]["Row"]> & {
+          tag: string;
+          vendor_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["vendor_tags"]["Insert"]>;
+        Relationships: [];
+      };
+      vendor_service_tags: {
+        Row: RowWithTimestamps & {
+          id: string;
+          service_id: string;
+          tag: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["vendor_service_tags"]["Row"]> & {
+          service_id: string;
+          tag: string;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["vendor_service_tags"]["Insert"]
+        >;
+        Relationships: [];
+      };
+      event_tags: {
+        Row: RowWithTimestamps & {
+          event_id: string;
+          id: string;
+          tag: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["event_tags"]["Row"]> & {
+          event_id: string;
+          tag: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["event_tags"]["Insert"]>;
         Relationships: [];
       };
     };

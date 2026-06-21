@@ -89,6 +89,15 @@ export type MarketplaceItem = {
   vendorId?: string | null;
   serviceId?: string | null;
   venueId?: string | null;
+  averageResponseMinutes?: number;
+  budgetTier?: "economy" | "standard" | "premium" | "luxury";
+  cultures?: string[];
+  languages?: string[];
+  maxGuestCount?: number;
+  minGuestCount?: number;
+  repeatClientRate?: number;
+  reviewCount?: number;
+  tags?: string[];
 };
 
 export type QuoteContext = {
@@ -385,8 +394,12 @@ export const marketplaceItems: MarketplaceItem[] = [
     description: "Historic event campus and theatre in Mid-Wilshire for polished large gatherings.",
     pricing: { kind: "flat", basePrice: 5500, label: "venue estimate" },
     availability: [{ days: [...everyDay], start: "08:00", end: "23:00" }],
+    budgetTier: "premium",
+    maxGuestCount: 1200,
+    reviewCount: 220,
     sourceLabel: "Official site / venue page",
     sourceUrl: "https://ebellofla.org/special-events/",
+    tags: ["wedding", "corporate", "gala", "formal", "historic", "theatre"],
   },
   {
     id: 2,
@@ -403,8 +416,12 @@ export const marketplaceItems: MarketplaceItem[] = [
     description: "Large landmark venue suited to conferences, shows, graduations, and expos.",
     pricing: { kind: "flat", basePrice: 8400, label: "large venue estimate" },
     availability: [{ days: [...everyDay], start: "08:00", end: "22:00" }],
+    budgetTier: "premium",
+    maxGuestCount: 6000,
+    reviewCount: 310,
     sourceLabel: "Official venue info",
     sourceUrl: "https://www.shrineauditorium.com/venue-info",
+    tags: ["conference", "convention", "expo", "graduation", "av", "large-format"],
   },
   {
     id: 3,
@@ -421,8 +438,12 @@ export const marketplaceItems: MarketplaceItem[] = [
     description: "World-famous private clubhouse with dining, shows, and private group options.",
     pricing: { kind: "flat", basePrice: 3200, label: "private group estimate" },
     availability: [{ days: [...everyDay], start: "17:00", end: "23:30" }],
+    budgetTier: "premium",
+    maxGuestCount: 300,
+    reviewCount: 480,
     sourceLabel: "Official site",
     sourceUrl: "https://www.magiccastle.com/",
+    tags: ["birthday", "magic", "private-party", "entertainment", "dining"],
   },
   {
     id: 4,
@@ -439,8 +460,12 @@ export const marketplaceItems: MarketplaceItem[] = [
     description: "Indoor-outdoor event space in Culver City with a distinctive design-forward feel.",
     pricing: { kind: "flat", basePrice: 4900, label: "venue estimate" },
     availability: [{ days: [...everyDay], start: "09:00", end: "23:00" }],
+    budgetTier: "premium",
+    maxGuestCount: 250,
+    reviewCount: 185,
     sourceLabel: "Official site",
     sourceUrl: "https://www.smogshoppe.com/",
+    tags: ["wedding", "corporate", "indoor-outdoor", "sustainable", "private-party"],
   },
   {
     id: 5,
@@ -456,8 +481,15 @@ export const marketplaceItems: MarketplaceItem[] = [
     description: "Real LA catering brand for social, wedding, corporate, and private chef events.",
     pricing: { kind: "perGuest", perGuest: 115, minimum: 2500, label: "per guest estimate" },
     availability: [{ days: [...everyDay], start: "08:00", end: "23:00" }],
+    averageResponseMinutes: 240,
+    budgetTier: "luxury",
+    maxGuestCount: 1200,
+    minGuestCount: 25,
+    repeatClientRate: 72,
+    reviewCount: 260,
     sourceLabel: "Official site",
     sourceUrl: "https://wolfgangpuckcatering.com/",
+    tags: ["catering", "premium", "wedding", "corporate", "gala", "staffing"],
   },
   {
     id: 6,
@@ -476,8 +508,14 @@ export const marketplaceItems: MarketplaceItem[] = [
       { days: [...weekdays], start: "14:00", end: "23:00" },
       { days: [...weekend], start: "10:00", end: "23:30" },
     ],
+    averageResponseMinutes: 120,
+    budgetTier: "standard",
+    maxGuestCount: 400,
+    repeatClientRate: 68,
+    reviewCount: 190,
     sourceLabel: "Official site",
     sourceUrl: "https://www.voxdjs.com/",
+    tags: ["dj", "dance", "birthday", "graduation", "wedding", "corporate", "mc"],
   },
   {
     id: 7,
@@ -493,8 +531,14 @@ export const marketplaceItems: MarketplaceItem[] = [
     description: "Audio, video, lighting, staging, and event production rental provider.",
     pricing: { kind: "hourly", hourlyRate: 180, minHours: 3, setupFee: 250, label: "production crew estimate" },
     availability: [{ days: [...everyDay], start: "07:00", end: "23:00" }],
+    averageResponseMinutes: 180,
+    budgetTier: "premium",
+    maxGuestCount: 1000,
+    repeatClientRate: 61,
+    reviewCount: 130,
     sourceLabel: "Official site",
     sourceUrl: "https://www.rentforevent.com/",
+    tags: ["av", "conference", "seminar", "trade-show", "live-streaming", "production"],
   },
   {
     id: 8,
@@ -510,8 +554,14 @@ export const marketplaceItems: MarketplaceItem[] = [
     description: "Party rentals and entertainment equipment for social and corporate events.",
     pricing: { kind: "flat", basePrice: 1250, label: "rental package estimate" },
     availability: [{ days: [...everyDay], start: "07:00", end: "20:00" }],
+    averageResponseMinutes: 300,
+    budgetTier: "standard",
+    maxGuestCount: 300,
+    repeatClientRate: 58,
+    reviewCount: 115,
     sourceLabel: "Official site",
     sourceUrl: "https://www.lapartyworks.com/",
+    tags: ["rentals", "photo-booth", "birthday", "party", "family-friendly", "corporate"],
   },
   {
     id: 9,
@@ -527,8 +577,12 @@ export const marketplaceItems: MarketplaceItem[] = [
     description: "Los Angeles bakery for cakes and desserts; useful for birthday and shower proof-of-concept.",
     pricing: { kind: "flat", basePrice: 380, label: "custom dessert estimate" },
     availability: [{ days: [...weekdays, ...weekend], start: "09:00", end: "18:00" }],
+    averageResponseMinutes: 360,
+    budgetTier: "standard",
+    reviewCount: 145,
     sourceLabel: "Official site",
     sourceUrl: "https://www.larkcakeshop.com/",
+    tags: ["cake", "dessert", "birthday", "baby-shower", "wedding", "custom"],
   },
   {
     id: 10,
@@ -544,8 +598,14 @@ export const marketplaceItems: MarketplaceItem[] = [
     description: "Event rental company for tables, seating, tabletop, and larger rental needs.",
     pricing: { kind: "flat", basePrice: 1600, label: "rental order estimate" },
     availability: [{ days: [...everyDay], start: "07:00", end: "20:00" }],
+    averageResponseMinutes: 240,
+    budgetTier: "premium",
+    maxGuestCount: 800,
+    repeatClientRate: 65,
+    reviewCount: 150,
     sourceLabel: "Official site",
     sourceUrl: "https://www.tacer.biz/",
+    tags: ["rentals", "wedding", "corporate", "gala", "tables", "seating"],
   },
   {
     id: 11,
@@ -561,8 +621,13 @@ export const marketplaceItems: MarketplaceItem[] = [
     description: "Los Angeles floral studio for weddings, parties, memorials, and upscale arrangements.",
     pricing: { kind: "flat", basePrice: 900, label: "floral design estimate" },
     availability: [{ days: [...everyDay], start: "07:00", end: "18:00" }],
+    averageResponseMinutes: 420,
+    budgetTier: "premium",
+    repeatClientRate: 70,
+    reviewCount: 175,
     sourceLabel: "Official site",
     sourceUrl: "https://marksgarden.com/",
+    tags: ["florals", "wedding", "funeral", "memorial", "baby-shower", "gala"],
   },
   {
     id: 12,
@@ -578,8 +643,13 @@ export const marketplaceItems: MarketplaceItem[] = [
     description: "Public marketplace page for Los Angeles magicians used as a real-provider proof source.",
     pricing: { kind: "hourly", hourlyRate: 275, minHours: 1, label: "magic performance estimate" },
     availability: [{ days: [...weekend], start: "10:00", end: "20:00" }],
+    averageResponseMinutes: 480,
+    budgetTier: "standard",
+    maxGuestCount: 120,
+    reviewCount: 90,
     sourceLabel: "Marketplace page",
     sourceUrl: "https://www.thebash.com/search/magician-los-angeles-ca",
+    tags: ["magic", "birthday", "family-friendly", "kids", "entertainment"],
   },
   {
     id: 13,
@@ -595,8 +665,13 @@ export const marketplaceItems: MarketplaceItem[] = [
     description: "Public marketplace page for princess and character party performers near Los Angeles.",
     pricing: { kind: "hourly", hourlyRate: 150, minHours: 2, label: "character performer estimate" },
     availability: [{ days: [...weekend], start: "09:00", end: "19:00" }],
+    averageResponseMinutes: 480,
+    budgetTier: "standard",
+    maxGuestCount: 80,
+    reviewCount: 72,
     sourceLabel: "Marketplace page",
     sourceUrl: "https://www.thebash.com/search/princess-party-los-angeles-ca",
+    tags: ["character", "kids", "birthday", "family-friendly", "costume", "entertainment"],
   },
   {
     id: 14,
@@ -612,7 +687,12 @@ export const marketplaceItems: MarketplaceItem[] = [
     description: "Public Yelp category page used to validate real local photo booth options.",
     pricing: { kind: "hourly", hourlyRate: 125, minHours: 3, setupFee: 125, label: "booth rental estimate" },
     availability: [{ days: [...everyDay], start: "10:00", end: "23:00" }],
+    averageResponseMinutes: 360,
+    budgetTier: "standard",
+    maxGuestCount: 500,
+    reviewCount: 120,
     sourceLabel: "Yelp category",
     sourceUrl: "https://www.yelp.com/search?find_desc=Photo+Booth+Rentals&find_loc=Los+Angeles%2C+CA",
+    tags: ["photo-booth", "birthday", "wedding", "graduation", "corporate", "party"],
   },
 ];

@@ -126,4 +126,44 @@ begin
     magic_vendor,
     character_vendor
   );
+
+  insert into public.vendor_tags (vendor_id, tag)
+  values
+    (venue_vendor, 'venue'),
+    (venue_vendor, 'wedding'),
+    (venue_vendor, 'corporate'),
+    (venue_vendor, 'formal'),
+    (dj_vendor, 'dj'),
+    (dj_vendor, 'birthday'),
+    (dj_vendor, 'dance'),
+    (dj_vendor, 'graduation'),
+    (catering_vendor, 'catering'),
+    (catering_vendor, 'corporate'),
+    (catering_vendor, 'gala'),
+    (catering_vendor, 'memorial'),
+    (booth_vendor, 'photo-booth'),
+    (booth_vendor, 'party'),
+    (booth_vendor, 'graduation'),
+    (rentals_vendor, 'rentals'),
+    (rentals_vendor, 'backyard'),
+    (rentals_vendor, 'baby-shower'),
+    (flowers_vendor, 'florals'),
+    (flowers_vendor, 'memorial'),
+    (flowers_vendor, 'wedding'),
+    (cake_vendor, 'cake'),
+    (cake_vendor, 'dessert'),
+    (cake_vendor, 'birthday'),
+    (security_vendor, 'security'),
+    (security_vendor, 'large-format'),
+    (security_vendor, 'corporate'),
+    (music_vendor, 'live-music'),
+    (music_vendor, 'gala'),
+    (music_vendor, 'wedding'),
+    (magic_vendor, 'magic'),
+    (magic_vendor, 'kids'),
+    (magic_vendor, 'family-friendly'),
+    (character_vendor, 'character'),
+    (character_vendor, 'costume'),
+    (character_vendor, 'family-friendly')
+  on conflict (vendor_id, tag) do nothing;
 end $$;

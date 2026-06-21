@@ -15,6 +15,8 @@ type VendorBusinessRow = PublicTableRow<"vendor_businesses">;
 type VendorServiceRow = PublicTableRow<"vendor_services">;
 type VendorAvailabilityRow = PublicTableRow<"vendor_availability">;
 type VendorPhotoRow = PublicTableRow<"vendor_photos">;
+type VendorTagRow = PublicTableRow<"vendor_tags">;
+type VendorServiceTagRow = PublicTableRow<"vendor_service_tags">;
 type EventRow = PublicTableRow<"events">;
 type CartItemRow = PublicTableRow<"cart_items">;
 
@@ -91,11 +93,14 @@ export async function getMarketplaceProviders(supabase: TypedSupabaseClient) {
     return [];
   }
 
-  const [services, availabilityByVendor, photosByVendor] = await Promise.all([
+  const [services, availabilityByVendor, photosByVendor, tagsByVendor] = await Promise.all([
     getVendorServices(supabase, vendorIds),
     getAvailabilityByVendor(supabase, vendorIds),
     getPhotosByVendor(supabase, vendorIds),
+    getTagsByVendor(supabase, vendorIds),
   ]);
+  const serviceIds = services.map((service) => service.id);
+  const tagsByService = await getTagsByService(supabase, serviceIds);
   const vendorById = new Map(vendors.map((vendor) => [vendor.id, vendor]));
 
   return services
@@ -111,6 +116,10 @@ export async function getMarketplaceProviders(supabase: TypedSupabaseClient) {
         service,
         availabilityByVendor.get(vendor.id) ?? [],
         photosByVendor.get(vendor.id) ?? [],
+        [
+          ...(tagsByVendor.get(vendor.id) ?? []),
+          ...(tagsByService.get(service.id) ?? []),
+        ],
         index,
       );
     })
@@ -266,6 +275,7 @@ function mapServiceToMarketplaceItem(
   service: VendorServiceRow,
   availability: VendorAvailabilityRow[],
   photos: VendorPhotoRow[],
+  tags: string[],
   index: number,
 ): MarketplaceItem {
   const type = toServiceName(service.category);
@@ -300,15 +310,75 @@ function mapServiceToMarketplaceItem(
     price: basePrice,
     pricing,
     rating: 4.85,
+    reviewCount: 1,
     serviceId: service.id,
     serviceRadiusMiles: vendor.service_radius_miles,
     services: [type],
     sourceLabel: vendor.website_url ? "Vendor website" : "Database vendor",
     sourceUrl: vendor.website_url ?? "#",
+    tags: Array.from(new Set([...tags, service.category, vendor.category, city])),
     type,
     vendorId: vendor.id,
     venueId: null,
   };
+}
+
+async function getTagsByVendor(
+  supabase: TypedSupabaseClient,
+  vendorIds: string[],
+) {
+  if (!vendorIds.length) {
+    return new Map<string, string[]>();
+  }
+
+  const { data, error } = await supabase
+    .from("vendor_tags")
+    .select("*")
+    .in("vendor_id", vendorIds);
+
+  if (error) {
+    if (error.code === "42P01") {
+      return new Map<string, string[]>();
+    }
+
+    throw error;
+  }
+
+  return (data ?? []).reduce((map, row: VendorTagRow) => {
+    const rows = map.get(row.vendor_id) ?? [];
+    rows.push(row.tag);
+    map.set(row.vendor_id, rows);
+    return map;
+  }, new Map<string, string[]>());
+}
+
+async function getTagsByService(
+  supabase: TypedSupabaseClient,
+  serviceIds: string[],
+) {
+  if (!serviceIds.length) {
+    return new Map<string, string[]>();
+  }
+
+  const { data, error } = await supabase
+    .from("vendor_service_tags")
+    .select("*")
+    .in("service_id", serviceIds);
+
+  if (error) {
+    if (error.code === "42P01") {
+      return new Map<string, string[]>();
+    }
+
+    throw error;
+  }
+
+  return (data ?? []).reduce((map, row: VendorServiceTagRow) => {
+    const rows = map.get(row.service_id) ?? [];
+    rows.push(row.tag);
+    map.set(row.service_id, rows);
+    return map;
+  }, new Map<string, string[]>());
 }
 
 async function getPhotosByVendor(
