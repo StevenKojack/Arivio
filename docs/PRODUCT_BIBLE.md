@@ -6,93 +6,93 @@
 
 [**TABLE OF CONTENTS	1**](#table-of-contents)
 
-[**Chapter 1: The Event Lifecycle	2**](#chapter-1:-the-event-lifecycle)
+[**Chapter 1: The Event Lifecycle	3**](#chapter-1:-the-event-lifecycle)
 
-[Purpose of This Chapter	2](#purpose-of-this-chapter)
+[Purpose of This Chapter	3](#purpose-of-this-chapter)
 
-[The Event Lifecycle	2](#the-event-lifecycle)
+[The Event Lifecycle	3](#the-event-lifecycle)
 
-[Stage One	4](#stage-one)
+[Stage One	5](#stage-one)
 
-[Idea	4](#idea)
+[Idea	5](#idea)
 
-[Transition	5](#transition)
+[Transition	6](#transition)
 
-[Stage Two	5](#stage-two)
+[Stage Two	6](#stage-two)
 
-[Research	5](#research)
+[Research	6](#research)
 
-[The Five Defining Moments	6](#the-five-defining-moments)
+[The Five Defining Moments	7](#the-five-defining-moments)
 
-[Where Trust Is Won	7](#where-trust-is-won)
+[Where Trust Is Won	8](#where-trust-is-won)
 
-[Where Trust Is Lost	7](#where-trust-is-lost)
+[Where Trust Is Lost	8](#where-trust-is-lost)
 
-[Opportunities for Automation	8](#opportunities-for-automation)
+[Opportunities for Automation	9](#opportunities-for-automation)
 
-[Opportunities for Delight	8](#opportunities-for-delight)
+[Opportunities for Delight	9](#opportunities-for-delight)
 
-[If Arivio Disappeared Tomorrow	8](#if-arivio-disappeared-tomorrow)
+[If Arivio Disappeared Tomorrow	9](#if-arivio-disappeared-tomorrow)
 
-[**Chapter 2: The Nature of Events	10**](#chapter-2:-the-nature-of-events)
+[**Chapter 2: The Nature of Events	11**](#chapter-2:-the-nature-of-events)
 
-[Purpose of This Chapter	10](#purpose-of-this-chapter-1)
+[Purpose of This Chapter	11](#purpose-of-this-chapter-1)
 
-[Every Event Has Hidden Structure	10](#every-event-has-hidden-structure)
+[Every Event Has Hidden Structure	11](#every-event-has-hidden-structure)
 
-[Events Are Compositions	12](#events-are-compositions)
+[Events Are Compositions	13](#events-are-compositions)
 
-[The Dimensions of Every Event	12](#the-dimensions-of-every-event)
+[The Dimensions of Every Event	13](#the-dimensions-of-every-event)
 
-[Purpose	13](#purpose)
+[Purpose	14](#purpose)
 
-[Emotional Tone	13](#emotional-tone)
+[Emotional Tone	14](#emotional-tone)
 
-[Formality	14](#formality)
+[Formality	15](#formality)
 
-[Social Structure	14](#social-structure)
+[Social Structure	15](#social-structure)
 
-[Life Stage	14](#life-stage)
+[Life Stage	15](#life-stage)
 
-[Cultural Influence	15](#cultural-influence)
+[Cultural Influence	16](#cultural-influence)
 
-[Religious Influence	15](#religious-influence)
+[Religious Influence	16](#religious-influence)
 
-[Scale	16](#scale)
+[Scale	17](#scale)
 
-[Hospitality Expectations	16](#hospitality-expectations)
+[Hospitality Expectations	17](#hospitality-expectations)
 
-[Coordination Complexity	17](#coordination-complexity)
+[Coordination Complexity	18](#coordination-complexity)
 
-[Event Families	17](#event-families)
+[Event Families	18](#event-families)
 
-[Life Milestones	17](#life-milestones)
+[Life Milestones	18](#life-milestones)
 
-[Celebrations	18](#celebrations)
+[Celebrations	19](#celebrations)
 
-[Social Gatherings	18](#social-gatherings)
+[Social Gatherings	19](#social-gatherings)
 
-[Business Events	18](#business-events)
+[Business Events	19](#business-events)
 
-[Community Events	19](#community-events)
+[Community Events	20](#community-events)
 
-[Memorial Events	19](#memorial-events)
+[Memorial Events	20](#memorial-events)
 
-[Hidden Relationships	19](#hidden-relationships)
+[Hidden Relationships	20](#hidden-relationships)
 
-[Required Decisions	21](#required-decisions)
+[Required Decisions	22](#required-decisions)
 
-[Contextual Decisions	21](#contextual-decisions)
+[Contextual Decisions	22](#contextual-decisions)
 
-[Opportunities	22](#opportunities)
+[Opportunities	23](#opportunities)
 
-[Risks	22](#risks)
+[Risks	23](#risks)
 
-[The Evolution of Understanding	23](#the-evolution-of-understanding)
+[The Evolution of Understanding	24](#the-evolution-of-understanding)
 
-[Foundational Principles	25](#foundational-principles)
+[Foundational Principles	26](#foundational-principles)
 
-[Chapter Summary	25](#chapter-summary)
+[Chapter Summary	26](#chapter-summary)
 
 # **Chapter 1: The Event Lifecycle** {#chapter-1:-the-event-lifecycle}
 

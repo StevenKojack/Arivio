@@ -6,9 +6,7 @@
 
 [**TABLE OF CONTENTS	1**](#table-of-contents)
 
-[**Chapter 1	2**](#chapter-1:-the-arivio-experience)
-
-[**The Arivio Experience	2**](#heading=h.cb5ys1pvb237)
+[**Chapter 1: The Arivio Experience	2**](#chapter-1:-the-arivio-experience)
 
 [1.1 Purpose of This Chapter	2](#1.1-purpose-of-this-chapter)
 
@@ -33,6 +31,70 @@
 [1.11 The Responsibility of Every Designer	10](#1.11-the-responsibility-of-every-designer)
 
 [Chapter 1 Summary	11](#chapter-1-summary)
+
+[**Chapter 2: Interaction Philosophy	12**](#chapter-2:-interaction-philosophy)
+
+[2.1 Purpose of This Chapter	12](#2.1-purpose-of-this-chapter)
+
+[2.2 Designing for Mental Effort, Not Physical Effort	12](#2.2-designing-for-mental-effort,-not-physical-effort)
+
+[2.3 The Product Should Lead Without Taking Control	13](#2.3-the-product-should-lead-without-taking-control)
+
+[2.4 Progress Should Always Be Visible	14](#2.4-progress-should-always-be-visible)
+
+[2.5 Every Interaction Should Answer a Question	14](#2.5-every-interaction-should-answer-a-question)
+
+[2.6 Simplicity Is the Elimination of Unnecessary Decisions	15](#2.6-simplicity-is-the-elimination-of-unnecessary-decisions)
+
+[2.7 One Primary Action	16](#2.7-one-primary-action)
+
+[2.8 Momentum Is More Important Than Speed	17](#2.8-momentum-is-more-important-than-speed)
+
+[2.9 Personalization Should Feel Natural	17](#2.9-personalization-should-feel-natural)
+
+[2.10 Intelligence Should Be Invisible	18](#2.10-intelligence-should-be-invisible)
+
+[2.11 Exploration Should Never Be Punished	18](#2.11-exploration-should-never-be-punished)
+
+[2.12 Great Design Disappears	19](#2.12-great-design-disappears)
+
+[Chapter Summary	20](#chapter-summary)
+
+[**Chapter 3	21**](#chapter-3)
+
+[**The Planner's Mind	21**](#the-planner's-mind)
+
+[3.1 Purpose of This Chapter	21](#3.1-purpose-of-this-chapter)
+
+[3.2 Planning Begins With Excitement	21](#3.2-planning-begins-with-excitement)
+
+[3.3 Responsibility	22](#3.3-responsibility)
+
+[3.4 Decision Fatigue	23](#3.4-decision-fatigue)
+
+[3.5 Budget Anxiety	24](#3.5-budget-anxiety)
+
+[3.6 The Fear of Forgetting	24](#3.6-the-fear-of-forgetting)
+
+[3.7 Creative Confidence	25](#3.7-creative-confidence)
+
+[3.8 Social Pressure	26](#3.8-social-pressure)
+
+[3.9 Trust	26](#3.9-trust)
+
+[3.10 Last-Minute Stress	27](#3.10-last-minute-stress)
+
+[3.11 Regret	28](#3.11-regret)
+
+[3.12 Relief	29](#3.12-relief)
+
+[3.13 Pride	30](#3.13-pride)
+
+[3.14 The Emotional Progression	30](#3.14-the-emotional-progression)
+
+[3.15 The Philosophy of Empathy	31](#3.15-the-philosophy-of-empathy)
+
+[Chapter Summary	32](#chapter-summary-1)
 
 # **Chapter 1: The Arivio Experience** {#chapter-1:-the-arivio-experience}
 
@@ -410,11 +472,11 @@ Design Standard
 
 Arivio exists to quietly lift the weight of planning so people can focus on creating meaningful moments together.
 
-# **Chapter 2: Interaction Philosophy**
+# **Chapter 2: Interaction Philosophy** {#chapter-2:-interaction-philosophy}
 
 ---
 
-## **2.1 Purpose of This Chapter**
+## **2.1 Purpose of This Chapter** {#2.1-purpose-of-this-chapter}
 
 Chapter 1 established what the Arivio experience should feel like.
 
@@ -436,7 +498,7 @@ Every interaction should reduce uncertainty while increasing confidence.
 
 ---
 
-## **2.2 Designing for Mental Effort, Not Physical Effort**
+## **2.2 Designing for Mental Effort, Not Physical Effort** {#2.2-designing-for-mental-effort,-not-physical-effort}
 
 Digital products often celebrate reducing the number of clicks required to complete a task. While efficiency is valuable, it is not the true measure of a great experience.
 
@@ -462,7 +524,7 @@ Reduce decisions before reducing clicks.
 
 ---
 
-## **2.3 The Product Should Lead Without Taking Control**
+## **2.3 The Product Should Lead Without Taking Control** {#2.3-the-product-should-lead-without-taking-control}
 
 One of the greatest responsibilities of good software is knowing when to guide and when to step aside.
 
@@ -490,7 +552,7 @@ The planner owns every intention.
 
 ---
 
-## **2.4 Progress Should Always Be Visible**
+## **2.4 Progress Should Always Be Visible** {#2.4-progress-should-always-be-visible}
 
 Planning an event is emotionally demanding because progress often feels invisible.
 
@@ -516,7 +578,7 @@ People should always feel closer to their event than they did one minute ago.
 
 ---
 
-## **2.5 Every Interaction Should Answer a Question**
+## **2.5 Every Interaction Should Answer a Question** {#2.5-every-interaction-should-answer-a-question}
 
 Every time a planner pauses, there is usually a question in their mind.
 
@@ -542,7 +604,7 @@ Every interaction should answer a question before the user needs to ask it.
 
 ---
 
-## **2.6 Simplicity Is the Elimination of Unnecessary Decisions**
+## **2.6 Simplicity Is the Elimination of Unnecessary Decisions** {#2.6-simplicity-is-the-elimination-of-unnecessary-decisions}
 
 Simplicity is often misunderstood as minimalism.
 
@@ -570,7 +632,7 @@ Remove decisions that do not create value.
 
 ---
 
-## **2.7 One Primary Action**
+## **2.7 One Primary Action** {#2.7-one-primary-action}
 
 Attention is a limited resource.
 
@@ -594,7 +656,7 @@ Every moment has one clear next step.
 
 ---
 
-## **2.8 Momentum Is More Important Than Speed**
+## **2.8 Momentum Is More Important Than Speed** {#2.8-momentum-is-more-important-than-speed}
 
 Fast products are impressive.
 
@@ -622,7 +684,7 @@ Protect momentum above all else.
 
 ---
 
-## **2.9 Personalization Should Feel Natural**
+## **2.9 Personalization Should Feel Natural** {#2.9-personalization-should-feel-natural}
 
 Every meaningful event is personal.
 
@@ -648,7 +710,7 @@ Personalization should feel like understanding, not configuration.
 
 ---
 
-## **2.10 Intelligence Should Be Invisible**
+## **2.10 Intelligence Should Be Invisible** {#2.10-intelligence-should-be-invisible}
 
 Intelligence is only valuable when it removes effort.
 
@@ -672,7 +734,7 @@ The smartest interaction is the one that feels obvious.
 
 ---
 
-## **2.11 Exploration Should Never Be Punished**
+## **2.11 Exploration Should Never Be Punished** {#2.11-exploration-should-never-be-punished}
 
 Planning is not a linear activity.
 
@@ -702,7 +764,7 @@ Changing your mind should always feel safe.
 
 ---
 
-## **2.12 Great Design Disappears**
+## **2.12 Great Design Disappears** {#2.12-great-design-disappears}
 
 The purpose of interaction design is not to impress the user.
 
@@ -732,7 +794,7 @@ The best interaction is the one that quietly disappears behind the experience.
 
 ---
 
-## **Chapter Summary**
+## **Chapter Summary** {#chapter-summary}
 
 Interaction is how Arivio expresses its philosophy.
 
@@ -752,13 +814,13 @@ Every interaction should make planning feel lighter than it did one moment befor
 
  
 
-# **Chapter 3**
+# **Chapter 3** {#chapter-3}
 
-# **The Planner's Mind**
+# **The Planner's Mind** {#the-planner's-mind}
 
 ---
 
-## **3.1 Purpose of This Chapter**
+## **3.1 Purpose of This Chapter** {#3.1-purpose-of-this-chapter}
 
 Every interaction inside Arivio is ultimately a response to human psychology.
 
@@ -774,7 +836,7 @@ Design for the person before designing for the task.
 
 ---
 
-## **3.2 Planning Begins With Excitement**
+## **3.2 Planning Begins With Excitement** {#3.2-planning-begins-with-excitement}
 
 Every event begins long before planning begins.
 
@@ -814,7 +876,7 @@ Protect excitement by preventing uncertainty from replacing it.
 
 ---
 
-## **3.3 Responsibility**
+## **3.3 Responsibility** {#3.3-responsibility}
 
 Planning places a unique psychological burden on people.
 
@@ -852,7 +914,7 @@ Reduce emotional weight without reducing personal ownership.
 
 ---
 
-## **3.4 Decision Fatigue**
+## **3.4 Decision Fatigue** {#3.4-decision-fatigue}
 
 Every event requires hundreds of decisions.
 
@@ -880,7 +942,7 @@ Protect the planner's attention as carefully as their time.
 
 ---
 
-## **3.5 Budget Anxiety**
+## **3.5 Budget Anxiety** {#3.5-budget-anxiety}
 
 Money changes how people think.
 
@@ -910,7 +972,7 @@ Confidence matters more than cost alone.
 
 ---
 
-## **3.6 The Fear of Forgetting**
+## **3.6 The Fear of Forgetting** {#3.6-the-fear-of-forgetting}
 
 One of the most persistent emotions during planning is the fear that something important has been overlooked.
 
@@ -936,7 +998,7 @@ Replace uncertainty with reassurance.
 
 ---
 
-## **3.7 Creative Confidence**
+## **3.7 Creative Confidence** {#3.7-creative-confidence}
 
 Events are deeply personal expressions.
 
@@ -960,7 +1022,7 @@ Organization should expand creativity.
 
 ---
 
-## **3.8 Social Pressure**
+## **3.8 Social Pressure** {#3.8-social-pressure}
 
 Events are rarely judged only by the people planning them.
 
@@ -998,7 +1060,7 @@ Design for authenticity, never comparison.
 
 ---
 
-## **3.9 Trust**
+## **3.9 Trust** {#3.9-trust}
 
 Trust is not a feeling that appears at the end of planning.
 
@@ -1030,7 +1092,7 @@ Trust is created through consistent confidence, never through persuasion.
 
 ---
 
-## **3.10 Last-Minute Stress**
+## **3.10 Last-Minute Stress** {#3.10-last-minute-stress}
 
 Every event eventually reaches a point where preparation ends and execution begins.
 
@@ -1056,7 +1118,7 @@ As urgency increases, the product should become calmer.
 
 ---
 
-## **3.11 Regret**
+## **3.11 Regret** {#3.11-regret}
 
 Regret rarely comes from making imperfect decisions.
 
@@ -1090,7 +1152,7 @@ Help people trust the decisions they have already made.
 
 ---
 
-## **3.12 Relief**
+## **3.12 Relief** {#3.12-relief}
 
 Relief is the defining emotional outcome of Arivio.
 
@@ -1122,7 +1184,7 @@ Every interaction should leave the planner feeling lighter than before.
 
 ---
 
-## **3.13 Pride**
+## **3.13 Pride** {#3.13-pride}
 
 Every event represents effort.
 
@@ -1156,7 +1218,7 @@ Success should always belong to the planner.
 
 ---
 
-## **3.14 The Emotional Progression**
+## **3.14 The Emotional Progression** {#3.14-the-emotional-progression}
 
 Although every event is unique, the emotional journey of planning follows remarkably consistent patterns.
 
@@ -1188,7 +1250,7 @@ Understand the emotional journey before solving the logistical one.
 
 ---
 
-## **3.15 The Philosophy of Empathy**
+## **3.15 The Philosophy of Empathy** {#3.15-the-philosophy-of-empathy}
 
 Empathy is not kindness.
 
@@ -1220,7 +1282,7 @@ Design from understanding, not assumption.
 
 ---
 
-## **Chapter Summary**
+## **Chapter Summary** {#chapter-summary-1}
 
 The psychology of planning extends far beyond organization.
 
