@@ -245,13 +245,13 @@ export function EventWizard() {
 
   return (
     <section className="px-6 py-10 sm:px-8 lg:px-12">
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto max-w-5xl min-w-0">
         <StepRail
           canVisitStep={canVisitStep}
           currentStep={step}
           onStepChange={setStep}
         />
-        <div className="mt-8 overflow-hidden rounded-[34px] border border-neutral-200 bg-white shadow-[0_28px_90px_rgba(20,20,20,0.08)]">
+        <div className="mt-8 overflow-visible rounded-[34px] border border-neutral-200 bg-white shadow-[0_28px_90px_rgba(20,20,20,0.08)]">
           {step === 0 ? (
             <StepCard
               eyebrow="Step 1"
@@ -532,7 +532,7 @@ function StepRail({
   onStepChange: (index: number) => void;
 }) {
   return (
-    <div className="flex gap-2 overflow-x-auto pb-1">
+    <div className="flex min-w-0 gap-2 overflow-x-auto overscroll-x-contain scroll-smooth pb-1">
       {steps.map((label, index) => {
         const isAvailable = canVisitStep(index);
 
@@ -723,7 +723,7 @@ function UnderstandingCard({
             <input
               value={customNote}
               onChange={(event) => onCustomNoteChange(event.target.value)}
-              placeholder="Armenian DJ, banquet hall, catering..."
+              placeholder="Add culture, traditions, food preferences, accessibility needs, or specific vendors."
               className="h-12 flex-1 rounded-2xl border border-neutral-300 bg-white px-4 text-sm font-semibold outline-none transition focus:border-neutral-950"
             />
             <button

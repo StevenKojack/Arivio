@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { FloatingPopover } from "@/app/components/ui/FloatingPopover";
 
 type CalendarPickerProps = {
   label: string;
@@ -26,7 +27,7 @@ const monthNames = [
 const dayNames = ["S", "M", "T", "W", "T", "F", "S"];
 
 export function CalendarPicker({ label, onChange, value }: CalendarPickerProps) {
-  const popoverRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const selectedDate = value ? new Date(`${value}T12:00:00`) : null;
   const today = new Date();
   const [isOpen, setIsOpen] = useState(false);
@@ -45,24 +46,6 @@ export function CalendarPicker({ label, onChange, value }: CalendarPickerProps) 
       })
     : "Choose a date";
 
-  useEffect(() => {
-    function closeOnOutsideClick(event: MouseEvent) {
-      if (
-        popoverRef.current &&
-        event.target instanceof Node &&
-        !popoverRef.current.contains(event.target)
-      ) {
-        setIsOpen(false);
-      }
-    }
-
-    if (isOpen) {
-      document.addEventListener("mousedown", closeOnOutsideClick);
-    }
-
-    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
-  }, [isOpen]);
-
   function moveMonth(offset: number) {
     setViewDate(
       (current) => new Date(current.getFullYear(), current.getMonth() + offset, 1),
@@ -78,24 +61,30 @@ export function CalendarPicker({ label, onChange, value }: CalendarPickerProps) 
     <div className="relative">
       <p className="text-sm font-semibold text-neutral-800">{label}</p>
       <button
+        ref={triggerRef}
+        aria-expanded={isOpen}
+        aria-haspopup="dialog"
         type="button"
-        onClick={() => setIsOpen(true)}
-        className="mt-2 flex h-14 w-full items-center justify-between rounded-2xl border border-neutral-300 bg-white px-4 text-left text-sm font-semibold text-neutral-950 shadow-[0_10px_30px_rgba(20,20,20,0.04)] transition hover:-translate-y-0.5 hover:border-neutral-500 hover:shadow-[0_16px_40px_rgba(20,20,20,0.08)]"
+        onClick={() => setIsOpen((current) => !current)}
+        className="mt-2 flex h-14 w-full items-center justify-between rounded-2xl border border-neutral-300 bg-white px-4 text-left text-sm font-semibold text-neutral-950 shadow-[0_10px_30px_rgba(20,20,20,0.04)] transition duration-200 ease-out hover:-translate-y-0.5 hover:border-neutral-500 hover:shadow-[0_16px_40px_rgba(20,20,20,0.08)] focus:border-neutral-950 focus:outline-none focus:ring-4 focus:ring-neutral-950/10"
       >
         <span>{selectedLabel}</span>
         <span className="text-neutral-400">Date</span>
       </button>
 
-      {isOpen ? (
-        <div
-          ref={popoverRef}
-          className="absolute left-0 top-[88px] z-50 w-[min(92vw,760px)] rounded-[30px] border border-neutral-200 bg-white p-5 shadow-[0_34px_120px_rgba(20,20,20,0.22)]"
-        >
+      <FloatingPopover
+        isOpen={isOpen}
+        label={`${label} calendar`}
+        preferredHeight={430}
+        triggerRef={triggerRef}
+        width={760}
+        onClose={() => setIsOpen(false)}
+      >
           <div className="flex items-center justify-between gap-3">
             <button
               type="button"
               onClick={() => moveMonth(-1)}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-neutral-200 text-lg font-semibold transition hover:border-neutral-950"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-neutral-200 text-lg font-semibold transition duration-200 ease-out hover:-translate-y-0.5 hover:border-neutral-950"
             >
               {"<"}
             </button>
@@ -110,7 +99,7 @@ export function CalendarPicker({ label, onChange, value }: CalendarPickerProps) 
             <button
               type="button"
               onClick={() => moveMonth(1)}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-neutral-200 text-lg font-semibold transition hover:border-neutral-950"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-neutral-200 text-lg font-semibold transition duration-200 ease-out hover:-translate-y-0.5 hover:border-neutral-950"
             >
               {">"}
             </button>
@@ -128,8 +117,7 @@ export function CalendarPicker({ label, onChange, value }: CalendarPickerProps) 
               />
             ))}
           </div>
-        </div>
-      ) : null}
+      </FloatingPopover>
     </div>
   );
 }
@@ -171,11 +159,11 @@ function MonthView({
               key={dateValue}
               type="button"
               onClick={() => onSelect(dateValue)}
-              className={`relative aspect-square rounded-2xl text-sm font-semibold transition ${
+              className={`relative aspect-square rounded-2xl text-sm font-semibold transition duration-150 ease-out ${
                 isSelected
                   ? "bg-neutral-950 text-white shadow-[0_10px_26px_rgba(20,20,20,0.22)]"
-                  : isCurrentMonth
-                    ? "text-neutral-900 hover:bg-neutral-100"
+                : isCurrentMonth
+                    ? "text-neutral-900 hover:-translate-y-0.5 hover:bg-neutral-100"
                     : "text-neutral-300 hover:bg-neutral-50"
               }`}
             >

@@ -12,7 +12,7 @@ type StepCardProps = {
 
 export function StepCard({ action, body, children, eyebrow, title }: StepCardProps) {
   return (
-    <div className="grid gap-8 p-6 sm:p-8 lg:grid-cols-[0.72fr_1.28fr] lg:p-10">
+    <div className="grid min-w-0 animate-[fadeUp_220ms_ease-out] gap-8 p-6 sm:p-8 lg:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)] lg:p-10">
       <div className="flex flex-col justify-between gap-8">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#d94f48]">

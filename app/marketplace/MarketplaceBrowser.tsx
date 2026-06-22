@@ -563,8 +563,8 @@ export function MarketplaceBrowser() {
 
   return (
     <>
-      <div className="grid gap-8 xl:grid-cols-[1fr_360px]">
-        <div className="space-y-6">
+      <div className="grid min-w-0 gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="min-w-0 space-y-6">
           <section className="rounded-[32px] border border-neutral-200 bg-[linear-gradient(135deg,#ffffff,#fbfbfa)] p-5 shadow-[0_18px_50px_rgba(20,20,20,0.05)]">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
@@ -600,7 +600,7 @@ export function MarketplaceBrowser() {
             ) : null}
           </section>
 
-          <section className="grid gap-4 lg:grid-cols-[320px_1fr]">
+          <section className="grid min-w-0 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
             <div className="rounded-[28px] border border-neutral-200 bg-white p-5">
               <div className="flex items-center justify-between gap-3">
                 <div>

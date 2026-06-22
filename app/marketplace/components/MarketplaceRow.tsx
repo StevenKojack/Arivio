@@ -23,7 +23,7 @@ export function MarketplaceRow({
   }
 
   return (
-    <section className="rounded-[30px] border border-neutral-200 bg-white p-5 shadow-[0_18px_50px_rgba(20,20,20,0.05)]">
+    <section className="min-w-0 rounded-[30px] border border-neutral-200 bg-white p-5 shadow-[0_18px_50px_rgba(20,20,20,0.05)] transition duration-200 ease-out hover:shadow-[0_22px_64px_rgba(20,20,20,0.08)]">
       <div className="flex items-end justify-between gap-4">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight text-neutral-950">
@@ -37,7 +37,7 @@ export function MarketplaceRow({
           {items.length}
         </span>
       </div>
-      <div className="mt-5 flex gap-4 overflow-x-auto pb-3 [scrollbar-width:thin]">
+      <div className="mt-5 flex min-w-0 snap-x gap-4 overflow-x-auto overscroll-x-contain scroll-smooth pb-3 [scrollbar-width:thin]">
         {items.map((item, index) => (
           <VendorCard
             key={`${title}-${item.id}`}

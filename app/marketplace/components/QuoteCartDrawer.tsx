@@ -42,7 +42,7 @@ export function QuoteCartDrawer({
   const total = cart.reduce((sum, line) => sum + getLineQuote(line), 0);
 
   return (
-    <aside className="sticky top-24 h-fit rounded-[28px] border border-neutral-200 bg-white p-5 shadow-[0_22px_70px_rgba(20,20,20,0.08)]">
+    <aside className="sticky top-24 h-fit min-w-0 rounded-[28px] border border-neutral-200 bg-white p-5 shadow-[0_22px_70px_rgba(20,20,20,0.08)] transition duration-200 ease-out hover:shadow-[0_26px_82px_rgba(20,20,20,0.1)]">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
@@ -103,7 +103,7 @@ export function QuoteCartDrawer({
           type="button"
           onClick={onRequestQuotes}
           disabled={isRequestingQuotes}
-          className="mt-5 h-12 w-full rounded-full bg-neutral-950 text-sm font-semibold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-5 h-12 w-full rounded-full bg-neutral-950 text-sm font-semibold text-white transition duration-200 ease-out hover:-translate-y-0.5 hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
         >
           {isRequestingQuotes ? "Requesting..." : "Request quotes"}
         </button>

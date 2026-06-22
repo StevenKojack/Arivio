@@ -26,7 +26,7 @@ export function VendorCard({
   ].slice(0, 3);
 
   return (
-    <article className="w-[292px] shrink-0 overflow-hidden rounded-[26px] border border-neutral-200 bg-white shadow-[0_14px_38px_rgba(20,20,20,0.06)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(20,20,20,0.12)]">
+    <article className="w-[min(78vw,292px)] shrink-0 snap-start overflow-hidden rounded-[26px] border border-neutral-200 bg-white shadow-[0_14px_38px_rgba(20,20,20,0.06)] transition duration-300 ease-out hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(20,20,20,0.12)]">
       <div className="relative h-40 overflow-hidden bg-[#f2f0ec]">
         <div
           className={`h-full bg-cover bg-center transition duration-500 hover:scale-105 ${
