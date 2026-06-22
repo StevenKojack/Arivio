@@ -35,6 +35,10 @@ import {
 } from "@/lib/repositories/cartRepository";
 import { ensureCurrentProfile } from "@/lib/repositories/profilesRepository";
 import { requestQuotesFromCart } from "@/lib/services/quoteService";
+import {
+  searchAddressSuggestions,
+  type AddressSuggestion,
+} from "@/lib/maps/geocoding";
 import { FilterDrawer } from "./components/FilterDrawer";
 import { MarketplaceMap, type MarketplaceMapPin } from "./components/MarketplaceMap";
 import { MarketplaceRow } from "./components/MarketplaceRow";
@@ -107,7 +111,11 @@ export function MarketplaceBrowser() {
   const [useHomeVenue, setUseHomeVenue] = useState(false);
   const [homeAddress, setHomeAddress] = useState(initialLocation);
   const [homeAreaName, setHomeAreaName] = useState(homeAreas[0].name);
+  const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
+  const [isSearchingAddress, setIsSearchingAddress] = useState(false);
   const [liveCoordinates, setLiveCoordinates] = useState<Coordinates | null>(null);
+  const [selectedAddressCoordinates, setSelectedAddressCoordinates] =
+    useState<Coordinates | null>(null);
   const [locationStatus, setLocationStatus] = useState("");
   const [cart, setCart] = useState<CartLine[]>([]);
   const [cartMessage, setCartMessage] = useState("");
@@ -128,7 +136,8 @@ export function MarketplaceBrowser() {
     [durationHours, endTime, eventDate, guestCount, startTime],
   );
   const homeArea = homeAreas.find((area) => area.name === homeAreaName) ?? homeAreas[0];
-  const homeCoordinates = liveCoordinates ?? homeArea.coordinates;
+  const homeCoordinates =
+    liveCoordinates ?? selectedAddressCoordinates ?? homeArea.coordinates;
   const eventCoordinates: Coordinates | undefined = useMemo(
     () =>
       useHomeVenue
@@ -382,6 +391,28 @@ export function MarketplaceBrowser() {
     return () => observer.disconnect();
   }, [marketplaceRows]);
 
+  useEffect(() => {
+    if (!useHomeVenue || homeAddress.trim().length < 3) {
+      return;
+    }
+
+    let isActive = true;
+    const debounceId = window.setTimeout(async () => {
+      setIsSearchingAddress(true);
+      const suggestions = await searchAddressSuggestions(homeAddress);
+
+      if (isActive) {
+        setAddressSuggestions(suggestions);
+        setIsSearchingAddress(false);
+      }
+    }, 260);
+
+    return () => {
+      isActive = false;
+      window.clearTimeout(debounceId);
+    };
+  }, [homeAddress, useHomeVenue]);
+
   function getLineContext(line: CartLine): QuoteContext {
     return {
       date: eventDate,
@@ -434,6 +465,7 @@ export function MarketplaceBrowser() {
           .sort((a, b) => a.distance - b.distance)[0]?.area;
 
         setLiveCoordinates(nextCoordinates);
+        setSelectedAddressCoordinates(nextCoordinates);
         setUseHomeVenue(true);
         setHomeAddress("Current live location");
         if (nearestArea) {
@@ -445,6 +477,40 @@ export function MarketplaceBrowser() {
         setLocationStatus("Location permission was blocked or unavailable.");
       },
       { enableHighAccuracy: true, maximumAge: 60000, timeout: 10000 },
+    );
+  }
+
+  function updateHomeAddress(value: string) {
+    setHomeAddress(value);
+    setLiveCoordinates(null);
+    setSelectedAddressCoordinates(null);
+    setLocationStatus("");
+    if (value.trim().length < 3) {
+      setAddressSuggestions([]);
+      setIsSearchingAddress(false);
+    }
+  }
+
+  function selectAddressSuggestion(suggestion: AddressSuggestion) {
+    const nearestArea = homeAreas
+      .map((area) => ({
+        area,
+        distance: getDistanceMiles(suggestion.coordinates, area.coordinates),
+      }))
+      .sort((a, b) => a.distance - b.distance)[0]?.area;
+
+    setHomeAddress(suggestion.label);
+    setSelectedAddressCoordinates(suggestion.coordinates);
+    setLiveCoordinates(null);
+    setUseHomeVenue(true);
+    if (nearestArea) {
+      setHomeAreaName(nearestArea.name);
+    }
+    setAddressSuggestions([]);
+    setLocationStatus(
+      suggestion.isFallback
+        ? "Using a demo location match. Provider estimates updated."
+        : "Address found. Provider estimates updated.",
     );
   }
 
@@ -638,7 +704,7 @@ export function MarketplaceBrowser() {
 
   return (
     <>
-      <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(430px,42vw)] 2xl:grid-cols-[minmax(0,1fr)_minmax(520px,38vw)]">
+      <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(380px,1fr)_minmax(390px,36vw)_300px] 2xl:grid-cols-[minmax(520px,1fr)_minmax(540px,36vw)_340px]">
         <div className="min-w-0 space-y-6">
           <EventContextPanel
             eventDate={eventDate}
@@ -652,10 +718,13 @@ export function MarketplaceBrowser() {
             endTime={endTime}
             useHomeVenue={useHomeVenue}
             homeAddress={homeAddress}
+            addressSuggestions={addressSuggestions}
+            isSearchingAddress={isSearchingAddress}
             locationStatus={locationStatus}
             providerCount={providerEstimates.length}
-            onHomeAddressChange={setHomeAddress}
+            onHomeAddressChange={updateHomeAddress}
             onOpenFilters={() => setIsFilterDrawerOpen(true)}
+            onSelectAddressSuggestion={selectAddressSuggestion}
             onToggleHomeVenue={() => setUseHomeVenue((current) => !current)}
             onUseCurrentLocation={useCurrentLocation}
           />
@@ -670,8 +739,6 @@ export function MarketplaceBrowser() {
             </button>
             {renderQuoteCart()}
           </div>
-
-          <div className="hidden xl:block">{renderQuoteCart()}</div>
 
           {marketplaceRows.length ? (
             <div className="space-y-6 animate-[fadeUp_280ms_ease-out]">
@@ -705,19 +772,21 @@ export function MarketplaceBrowser() {
         </div>
 
         <aside className="hidden min-w-0 xl:block" aria-label="Persistent marketplace map">
-          <div className="fixed bottom-8 right-6 top-24 z-20 w-[min(42vw,620px)] 2xl:right-8 2xl:w-[min(38vw,680px)]">
-            <MarketplaceMap
-              activeCategory={activeRow?.title ?? "Best matches"}
-              cartedIds={cartedIds}
-              eventCoordinates={eventCoordinates}
-              hoveredItemId={hoveredItemId}
-              layout="panel"
-              pins={mapPins}
-              selectedItemId={selectedMapItemId}
-              onHoverItem={setHoveredItemId}
-              onSelectItem={selectMapItem}
-            />
-          </div>
+          <MarketplaceMap
+            activeCategory={activeRow?.title ?? "Best matches"}
+            cartedIds={cartedIds}
+            eventCoordinates={eventCoordinates}
+            hoveredItemId={hoveredItemId}
+            layout="sticky"
+            pins={mapPins}
+            selectedItemId={selectedMapItemId}
+            onHoverItem={setHoveredItemId}
+            onSelectItem={selectMapItem}
+          />
+        </aside>
+
+        <aside className="hidden min-w-0 xl:block" aria-label="Quote cart">
+          {renderQuoteCart()}
         </aside>
       </div>
 
@@ -786,7 +855,9 @@ function EventContextPanel({
   eventLocationLabel,
   guestCount,
   homeAddress,
+  addressSuggestions,
   initialNotes,
+  isSearchingAddress,
   locationStatus,
   marketplaceMessage,
   planSummary,
@@ -796,15 +867,18 @@ function EventContextPanel({
   useHomeVenue,
   onHomeAddressChange,
   onOpenFilters,
+  onSelectAddressSuggestion,
   onToggleHomeVenue,
   onUseCurrentLocation,
 }: {
+  addressSuggestions: AddressSuggestion[];
   endTime: string;
   eventDate: string;
   eventLocationLabel: string;
   guestCount: number;
   homeAddress: string;
   initialNotes: string;
+  isSearchingAddress: boolean;
   locationStatus: string;
   marketplaceMessage: string;
   planSummary: string;
@@ -814,6 +888,7 @@ function EventContextPanel({
   useHomeVenue: boolean;
   onHomeAddressChange: (value: string) => void;
   onOpenFilters: () => void;
+  onSelectAddressSuggestion: (suggestion: AddressSuggestion) => void;
   onToggleHomeVenue: () => void;
   onUseCurrentLocation: () => void;
 }) {
@@ -885,6 +960,35 @@ function EventContextPanel({
               placeholder="Home or event address"
               className="h-11 rounded-2xl border border-neutral-300 px-3 text-sm font-semibold text-neutral-900 outline-none focus:border-neutral-950"
             />
+            {isSearchingAddress || addressSuggestions.length ? (
+              <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-[#fbfbfa]">
+                {isSearchingAddress ? (
+                  <p className="px-4 py-3 text-xs font-semibold text-neutral-500">
+                    Searching nearby matches...
+                  </p>
+                ) : null}
+                {addressSuggestions.map((suggestion) => (
+                  <button
+                    key={suggestion.id}
+                    type="button"
+                    onClick={() => onSelectAddressSuggestion(suggestion)}
+                    className="flex w-full items-start justify-between gap-3 border-t border-neutral-100 px-4 py-3 text-left transition hover:bg-white"
+                  >
+                    <span>
+                      <span className="block text-sm font-semibold text-neutral-900">
+                        {suggestion.label}
+                      </span>
+                      <span className="mt-1 block text-xs font-semibold text-neutral-500">
+                        {getSuggestionLabel(suggestion)}
+                      </span>
+                    </span>
+                    <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-500">
+                      Select
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
             <button
               type="button"
               onClick={onUseCurrentLocation}
@@ -900,6 +1004,20 @@ function EventContextPanel({
       </div>
     </section>
   );
+}
+
+function getSuggestionLabel(suggestion: AddressSuggestion) {
+  const source = suggestion.isFallback ? "Demo match" : "Mapbox match";
+
+  if (suggestion.placeType === "venue") {
+    return `${source} - likely venue`;
+  }
+
+  if (suggestion.placeType === "city") {
+    return `${source} - city or area`;
+  }
+
+  return `${source} - likely address`;
 }
 
 function SummaryPill({ label, value }: { label: string; value: string }) {

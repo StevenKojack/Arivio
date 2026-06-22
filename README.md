@@ -58,9 +58,9 @@ Once configured, these flows can persist data:
 
 ## Mapbox Setup
 
-Arivio uses a Mapbox-ready marketplace map surface. Without a Mapbox key, the
-marketplace falls back to a local mock map with real provider coordinates and
-interactive pins.
+Arivio uses Mapbox GL for the marketplace command-center map. Without a Mapbox
+key, the marketplace falls back to a local mock map with real provider
+coordinates and interactive pins.
 
 To enable real map imagery:
 
@@ -73,11 +73,10 @@ NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_public_mapbox_token
 NEXT_PUBLIC_MAPBOX_STYLE_ID=mapbox/light-v11
 ```
 
-The current implementation uses Mapbox Static Images as the first production
-surface. Pins, active marketplace rows, hovered cards, selected vendors, and
-carted vendors are handled by Arivio so the app continues to work with or
-without Mapbox. A later pass can replace the static image layer with Mapbox GL
-for pan/zoom without changing the marketplace data model.
+The current implementation supports pan, drag, zoom, hoverable pins, clickable
+pins, selected vendor state, and carted vendor state. Address search uses
+Mapbox geocoding when the public token is available and falls back to curated
+demo suggestions when it is not.
 
 ## Current Backend Scope
 
