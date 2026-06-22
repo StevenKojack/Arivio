@@ -87,16 +87,16 @@ export function Navigation() {
       ];
 
   return (
-    <header className="sticky top-0 z-30 border-b border-black/5 bg-white/90 px-5 backdrop-blur-xl sm:px-8 lg:px-12">
+    <header className="sticky top-0 z-30 border-b border-white/60 bg-white/80 px-5 shadow-[0_10px_40px_rgba(20,20,20,0.04)] backdrop-blur-xl sm:px-8 lg:px-12">
       <nav className="mx-auto flex h-[72px] max-w-7xl items-center justify-between gap-4">
         <Logo />
 
-        <div className="hidden items-center rounded-full border border-neutral-200 bg-white p-1 text-sm font-semibold text-neutral-700 shadow-[0_10px_30px_rgba(20,20,20,0.05)] md:flex">
+        <div className="hidden items-center rounded-full border border-neutral-200 bg-white/85 p-1 text-sm font-semibold text-neutral-700 shadow-[0_12px_34px_rgba(20,20,20,0.06)] backdrop-blur md:flex">
           {centerLinks.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className="rounded-full px-5 py-2 transition hover:bg-neutral-100 hover:text-neutral-950"
+              className="rounded-full px-5 py-2 transition hover:-translate-y-0.5 hover:bg-neutral-100 hover:text-neutral-950"
             >
               {item.label}
             </Link>
@@ -106,7 +106,7 @@ export function Navigation() {
         <div className="flex items-center gap-2">
           <Link
             href="/vendor/onboarding"
-            className="hidden rounded-full px-4 py-2 text-sm font-semibold text-neutral-800 transition hover:bg-neutral-100 md:inline-flex"
+            className="hidden rounded-full px-4 py-2 text-sm font-semibold text-neutral-800 transition hover:-translate-y-0.5 hover:bg-white/80 md:inline-flex"
           >
             List your service
           </Link>
@@ -114,7 +114,7 @@ export function Navigation() {
             <button
               type="button"
               onClick={() => setMenuOpen((current) => !current)}
-              className="inline-flex h-11 items-center gap-3 rounded-full border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-950 shadow-[0_10px_24px_rgba(20,20,20,0.06)] transition hover:shadow-[0_14px_30px_rgba(20,20,20,0.1)]"
+              className="inline-flex h-11 items-center gap-3 rounded-full border border-neutral-200 bg-white/90 px-4 text-sm font-semibold text-neutral-950 shadow-[0_12px_30px_rgba(20,20,20,0.08)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_42px_rgba(20,20,20,0.12)]"
               aria-expanded={menuOpen}
             >
               <span className="grid gap-1">

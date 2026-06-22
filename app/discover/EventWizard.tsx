@@ -19,22 +19,24 @@ import { StepCard } from "./components/StepCard";
 import { TimeDurationPicker } from "./components/TimeDurationPicker";
 
 type LocationKind =
-  | "Home"
   | "Venue needed"
-  | "Already have venue"
-  | "Ceremony"
-  | "Reception"
-  | "Church"
-  | "Banquet hall"
-  | "Afterparty"
-  | "Other";
+  | "Already have venue";
+
+type LocationMode = "has_venue" | "needs_venue";
 
 type EventLocation = {
+  context: "likely_home" | "likely_venue" | "venue_needed" | "";
+  coordinates?: {
+    lat: number;
+    lng: number;
+  };
   id: number;
   kind: LocationKind;
+  mode: LocationMode | "";
   query: string;
   selectedAddress: string;
   selectedLabel: string;
+  selectedVenueId?: string;
 };
 
 type PlanAddition = {
@@ -46,16 +48,43 @@ type PlanAddition = {
 
 const steps = ["What", "Confirm", "When", "Where", "Guests", "Review"] as const;
 
-const locationKinds: LocationKind[] = [
-  "Home",
-  "Venue needed",
-  "Already have venue",
-  "Ceremony",
-  "Reception",
-  "Church",
-  "Banquet hall",
-  "Afterparty",
-  "Other",
+const mockVenuePins = [
+  {
+    address: "743 S Lucerne Blvd, Los Angeles, CA 90005",
+    capacity: "Up to 500 guests",
+    id: "ebell",
+    label: "The Ebell of Los Angeles",
+    match: "Elegant indoor venue",
+    neighborhood: "Mid-Wilshire",
+    position: { x: 42, y: 46 },
+  },
+  {
+    address: "665 W Jefferson Blvd, Los Angeles, CA 90007",
+    capacity: "Large format events",
+    id: "shrine",
+    label: "Shrine Auditorium",
+    match: "Best for conventions and fundraisers",
+    neighborhood: "University Park",
+    position: { x: 56, y: 66 },
+  },
+  {
+    address: "2651 S La Cienega Blvd, Los Angeles, CA 90034",
+    capacity: "Up to 150 guests",
+    id: "smogshoppe",
+    label: "SmogShoppe",
+    match: "Warm social gatherings",
+    neighborhood: "Culver City",
+    position: { x: 28, y: 58 },
+  },
+  {
+    address: "7001 Franklin Ave, Hollywood, CA 90028",
+    capacity: "Private club setting",
+    id: "magic-castle",
+    label: "The Magic Castle",
+    match: "Memorable entertainment-led events",
+    neighborhood: "Hollywood",
+    position: { x: 64, y: 30 },
+  },
 ];
 
 export function EventWizard() {
@@ -75,8 +104,10 @@ export function EventWizard() {
   const [isMultiDay, setIsMultiDay] = useState(false);
   const [locations, setLocations] = useState<EventLocation[]>([
     {
+      context: "",
       id: 1,
       kind: "Venue needed",
+      mode: "",
       query: "",
       selectedAddress: "",
       selectedLabel: "",
@@ -131,10 +162,7 @@ export function EventWizard() {
   const canOpenMarketplace =
     Boolean(timing.date && timing.startTime && timing.endTime) &&
     guestCount > 0 &&
-    locations.some((location) =>
-      location.kind === "Venue needed" ||
-      Boolean(location.query.trim() || location.selectedAddress),
-    );
+    locations.some((location) => location.mode && (location.mode === "needs_venue" || Boolean(location.query.trim() || location.selectedAddress)));
 
   function continueFromSearch(nextQuery = query) {
     const cleanQuery = nextQuery.trim();
@@ -204,23 +232,6 @@ export function EventWizard() {
         location.id === id ? { ...location, ...updates } : location,
       ),
     );
-  }
-
-  function addLocation() {
-    setLocations((current) => [
-      ...current,
-      {
-        id: Date.now(),
-        kind: "Reception",
-        query: "",
-        selectedAddress: "",
-        selectedLabel: "",
-      },
-    ]);
-  }
-
-  function removeLocation(id: number) {
-    setLocations((current) => current.filter((location) => location.id !== id));
   }
 
   function canVisitStep(index: number) {
@@ -377,32 +388,48 @@ export function EventWizard() {
               body="Add one location now, or separate places like ceremony and reception if the event needs them."
               action={<PrimaryButton label="Continue" onClick={() => setStep(4)} />}
             >
-              <div className="space-y-4">
-                {locations.map((location, index) => (
-                  <LocationCard
-                    key={location.id}
-                    index={index}
-                    location={location}
-                    canRemove={locations.length > 1}
-                    onRemove={() => removeLocation(location.id)}
-                    onSelectAddress={(suggestion) =>
-                      updateLocation(location.id, {
-                        query: suggestion.label,
-                        selectedAddress: suggestion.address,
-                        selectedLabel: suggestion.label,
-                      })
-                    }
-                    onUpdate={(updates) => updateLocation(location.id, updates)}
-                  />
-                ))}
-                <button
-                  type="button"
-                  onClick={addLocation}
-                  className="h-12 rounded-full border border-neutral-300 bg-white px-5 text-sm font-semibold text-neutral-950 transition hover:-translate-y-0.5 hover:border-neutral-950"
-                >
-                  Add another location
-                </button>
-              </div>
+              <LocationStep
+                eventLabel={
+                  recognition.preservedSubtype ??
+                  recognition.profile.subtype ??
+                  recognition.profile.primaryType
+                }
+                location={locations[0]}
+                onSelectAddress={(suggestion) =>
+                  updateLocation(locations[0].id, {
+                    context: suggestion.context,
+                    coordinates: suggestion.coordinates,
+                    kind: "Already have venue",
+                    mode: "has_venue",
+                    query: suggestion.label,
+                    selectedAddress: suggestion.address,
+                    selectedLabel: suggestion.label,
+                  })
+                }
+                onSelectMode={(mode) =>
+                  updateLocation(locations[0].id, {
+                    context: mode === "needs_venue" ? "venue_needed" : "",
+                    kind: mode === "needs_venue" ? "Venue needed" : "Already have venue",
+                    mode,
+                    query: "",
+                    selectedAddress: "",
+                    selectedLabel: "",
+                    selectedVenueId: undefined,
+                  })
+                }
+                onSelectVenue={(venue) =>
+                  updateLocation(locations[0].id, {
+                    context: "likely_venue",
+                    kind: "Venue needed",
+                    mode: "needs_venue",
+                    query: venue.neighborhood,
+                    selectedAddress: venue.address,
+                    selectedLabel: venue.label,
+                    selectedVenueId: venue.id,
+                  })
+                }
+                onUpdate={(updates) => updateLocation(locations[0].id, updates)}
+              />
             </StepCard>
           ) : null}
 
@@ -755,74 +782,278 @@ function UnderstandingCard({
   );
 }
 
-function LocationCard({
-  canRemove,
-  index,
+function LocationStep({
+  eventLabel,
   location,
-  onRemove,
   onSelectAddress,
+  onSelectMode,
+  onSelectVenue,
   onUpdate,
 }: {
-  canRemove: boolean;
-  index: number;
+  eventLabel: string;
   location: EventLocation;
-  onRemove: () => void;
   onSelectAddress: (suggestion: AddressSuggestion) => void;
+  onSelectMode: (mode: LocationMode) => void;
+  onSelectVenue: (venue: (typeof mockVenuePins)[number]) => void;
   onUpdate: (updates: Partial<EventLocation>) => void;
 }) {
+  const selectedVenue = mockVenuePins.find((venue) => venue.id === location.selectedVenueId);
+
   return (
-    <div className="rounded-[30px] border border-neutral-200 bg-[#fbfbfa] p-5">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-semibold text-neutral-950">
-          Location {index + 1}
-        </p>
-        {canRemove ? (
-          <button
-            type="button"
-            onClick={onRemove}
-            className="rounded-full border border-neutral-200 bg-white px-3 py-1 text-xs font-semibold text-neutral-600 transition hover:border-neutral-950"
-          >
-            Remove
-          </button>
-        ) : null}
+    <div className="space-y-5">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <LocationChoiceCard
+          body="Use a venue, hall, restaurant, home, or private address you already know."
+          eyebrow="I know the place"
+          isSelected={location.mode === "has_venue"}
+          title="I have a venue"
+          onClick={() => onSelectMode("has_venue")}
+        />
+        <LocationChoiceCard
+          body="Start with a map and explore spaces that fit the event context."
+          eyebrow="Help me find one"
+          isSelected={location.mode === "needs_venue"}
+          title="I need a venue"
+          onClick={() => onSelectMode("needs_venue")}
+        />
       </div>
-      <div className="mt-4 grid gap-4 sm:grid-cols-[220px_1fr]">
-        <label className="text-sm font-semibold text-neutral-800">
-          Type
-          <select
-            value={location.kind}
-            onChange={(event) =>
-              onUpdate({ kind: event.target.value as LocationKind })
-            }
-            className="mt-2 h-12 w-full rounded-2xl border border-neutral-300 bg-white px-4 text-sm font-semibold outline-none transition focus:border-neutral-950"
-          >
-            {locationKinds.map((kind) => (
-              <option key={kind}>{kind}</option>
-            ))}
-          </select>
-        </label>
-        {location.kind === "Venue needed" ? (
-          <label className="text-sm font-semibold text-neutral-800">
-            Preferred area
-            <input
-              value={location.query}
-              onChange={(event) => onUpdate({ query: event.target.value })}
-              placeholder="City, neighborhood, or leave flexible"
-              className="mt-2 h-12 w-full rounded-2xl border border-neutral-300 bg-white px-4 text-sm font-semibold outline-none transition focus:border-neutral-950"
-            />
-          </label>
-        ) : (
+
+      {location.mode === "has_venue" ? (
+        <div className="rounded-[32px] border border-neutral-200 bg-[linear-gradient(135deg,#ffffff,#fbfbfa)] p-5 shadow-[0_20px_60px_rgba(20,20,20,0.06)]">
+          <div className="mb-5">
+            <p className="text-sm font-semibold text-neutral-950">
+              Enter the venue or address
+            </p>
+            <p className="mt-1 text-sm leading-6 text-neutral-600">
+              Arivio will remember whether this looks like a venue or a private
+              address for better matching later.
+            </p>
+          </div>
           <AddressAutocomplete
-            label="Address or venue"
+            label="Venue or address"
             value={location.query}
             selectedAddress={location.selectedAddress}
             onChange={(value) =>
-              onUpdate({ query: value, selectedAddress: "", selectedLabel: "" })
+              onUpdate({
+                context: "",
+                query: value,
+                selectedAddress: "",
+                selectedLabel: "",
+              })
             }
             onSelect={onSelectAddress}
           />
-        )}
+          {location.selectedAddress ? (
+            <LocationSignal
+              context={location.context}
+              label={location.selectedLabel}
+            />
+          ) : null}
+        </div>
+      ) : null}
+
+      {location.mode === "needs_venue" ? (
+        <div className="overflow-hidden rounded-[32px] border border-neutral-200 bg-white shadow-[0_22px_70px_rgba(20,20,20,0.08)]">
+          <div className="grid gap-0 lg:grid-cols-[0.85fr_1.15fr]">
+            <div className="border-b border-neutral-200 p-5 lg:border-b-0 lg:border-r">
+              <p className="text-sm font-semibold text-neutral-950">
+                Venue discovery for {eventLabel}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-neutral-600">
+                Search an area or use your current location. The map is mocked
+                for now, but the data shape is ready for a real map provider.
+              </p>
+              <div className="mt-5 grid gap-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    onUpdate({
+                      context: "venue_needed",
+                      query: "Current location",
+                      selectedAddress: "",
+                      selectedLabel: "",
+                      selectedVenueId: undefined,
+                    })
+                  }
+                  className="h-12 rounded-full bg-neutral-950 px-5 text-sm font-semibold text-white shadow-[0_16px_36px_rgba(20,20,20,0.18)] transition hover:-translate-y-0.5 hover:bg-neutral-800"
+                >
+                  Use my current location
+                </button>
+                <label className="text-sm font-semibold text-neutral-800">
+                  Search city or area
+                  <input
+                    value={location.query}
+                    onChange={(event) =>
+                      onUpdate({
+                        context: "venue_needed",
+                        query: event.target.value,
+                        selectedAddress: "",
+                        selectedLabel: "",
+                        selectedVenueId: undefined,
+                      })
+                    }
+                    placeholder="Los Angeles, Glendale, Pasadena..."
+                    className="mt-2 h-12 w-full rounded-2xl border border-neutral-200 bg-white px-4 text-sm font-semibold outline-none transition focus:border-neutral-950"
+                  />
+                </label>
+              </div>
+              <div className="mt-5 space-y-2">
+                {mockVenuePins.map((venue) => (
+                  <button
+                    key={venue.id}
+                    type="button"
+                    onClick={() => onSelectVenue(venue)}
+                    className={`w-full rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 ${
+                      location.selectedVenueId === venue.id
+                        ? "border-neutral-950 bg-neutral-950 text-white shadow-[0_18px_46px_rgba(20,20,20,0.18)]"
+                        : "border-neutral-200 bg-[#fbfbfa] text-neutral-950 hover:border-neutral-400"
+                    }`}
+                  >
+                    <span className="block text-sm font-semibold">{venue.label}</span>
+                    <span
+                      className={`mt-1 block text-xs ${
+                        location.selectedVenueId === venue.id
+                          ? "text-neutral-300"
+                          : "text-neutral-500"
+                      }`}
+                    >
+                      {venue.match} · {venue.capacity}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <VenueDiscoveryMap
+              selectedVenueId={location.selectedVenueId}
+              onSelectVenue={onSelectVenue}
+            />
+          </div>
+          {selectedVenue ? (
+            <div className="border-t border-neutral-200 bg-[#fbfbfa] px-5 py-4">
+              <p className="text-sm font-semibold text-neutral-950">
+                Selected venue signal: {selectedVenue.label}
+              </p>
+              <p className="mt-1 text-sm text-neutral-600">
+                {selectedVenue.address}. If this venue is not already in
+                Arivio, this becomes a future vendor onboarding lead.
+              </p>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function LocationChoiceCard({
+  body,
+  eyebrow,
+  isSelected,
+  onClick,
+  title,
+}: {
+  body: string;
+  eyebrow: string;
+  isSelected: boolean;
+  onClick: () => void;
+  title: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group min-h-44 rounded-[30px] border p-5 text-left transition duration-300 hover:-translate-y-1 ${
+        isSelected
+          ? "border-neutral-950 bg-neutral-950 text-white shadow-[0_24px_70px_rgba(20,20,20,0.18)]"
+          : "border-neutral-200 bg-white text-neutral-950 shadow-[0_18px_44px_rgba(20,20,20,0.05)] hover:border-neutral-400 hover:shadow-[0_24px_70px_rgba(20,20,20,0.1)]"
+      }`}
+    >
+      <span
+        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+          isSelected ? "bg-white/10 text-neutral-200" : "bg-[#f7f2ee] text-neutral-600"
+        }`}
+      >
+        {eyebrow}
+      </span>
+      <span className="mt-8 block text-2xl font-semibold tracking-tight">
+        {title}
+      </span>
+      <span
+        className={`mt-3 block text-sm leading-6 ${
+          isSelected ? "text-neutral-300" : "text-neutral-600"
+        }`}
+      >
+        {body}
+      </span>
+    </button>
+  );
+}
+
+function LocationSignal({
+  context,
+  label,
+}: {
+  context: EventLocation["context"];
+  label: string;
+}) {
+  const isVenue = context === "likely_venue";
+
+  return (
+    <div className="mt-4 rounded-2xl border border-neutral-200 bg-[#fbfbfa] px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-neutral-400">
+        Address recognition
+      </p>
+      <p className="mt-1 text-sm font-semibold text-neutral-900">
+        {isVenue ? "Likely venue" : "Likely home/private address"}
+      </p>
+      <p className="mt-1 text-sm leading-6 text-neutral-600">
+        {isVenue
+          ? `${label} looks like a real venue. Arivio can use this signal for future venue outreach.`
+          : "This looks residential or private, so nearby mobile vendors will matter more than venue matches."}
+      </p>
+    </div>
+  );
+}
+
+function VenueDiscoveryMap({
+  onSelectVenue,
+  selectedVenueId,
+}: {
+  onSelectVenue: (venue: (typeof mockVenuePins)[number]) => void;
+  selectedVenueId?: string;
+}) {
+  return (
+    <div className="relative min-h-[430px] overflow-hidden bg-[linear-gradient(135deg,#e6ece6,#f4efe8)]">
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.5)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.5)_1px,transparent_1px)] bg-[size:38px_38px]" />
+      <div className="absolute left-5 top-5 rounded-full bg-white/90 px-4 py-2 text-xs font-semibold text-neutral-700 shadow-[0_14px_34px_rgba(20,20,20,0.12)] backdrop-blur">
+        Map-first venue discovery
       </div>
+      <div className="absolute bottom-5 left-5 right-5 rounded-3xl bg-white/90 p-4 shadow-[0_18px_50px_rgba(20,20,20,0.12)] backdrop-blur">
+        <p className="text-sm font-semibold text-neutral-950">
+          Mock map contract
+        </p>
+        <p className="mt-1 text-sm leading-6 text-neutral-600">
+          Pins, selection, current location, and city search are wired as UI
+          contracts so Google Maps or Mapbox can replace the mock layer next.
+        </p>
+      </div>
+      {mockVenuePins.map((venue) => {
+        const isSelected = selectedVenueId === venue.id;
+
+        return (
+          <button
+            key={venue.id}
+            type="button"
+            onClick={() => onSelectVenue(venue)}
+            className={`absolute z-10 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white px-4 py-2 text-xs font-semibold shadow-[0_18px_42px_rgba(20,20,20,0.24)] transition hover:-translate-y-[58%] ${
+              isSelected ? "bg-[#ff5a5f] text-white" : "bg-neutral-950 text-white"
+            }`}
+            style={{ left: `${venue.position.x}%`, top: `${venue.position.y}%` }}
+          >
+            {venue.label}
+          </button>
+        );
+      })}
     </div>
   );
 }

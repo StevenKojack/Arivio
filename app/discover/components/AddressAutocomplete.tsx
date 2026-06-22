@@ -4,6 +4,11 @@ import { useMemo, useState } from "react";
 
 export type AddressSuggestion = {
   address: string;
+  coordinates: {
+    lat: number;
+    lng: number;
+  };
+  context: "likely_home" | "likely_venue";
   label: string;
   neighborhood: string;
 };
@@ -19,27 +24,37 @@ type AddressAutocompleteProps = {
 const mockAddressSuggestions: AddressSuggestion[] = [
   {
     address: "743 S Lucerne Blvd, Los Angeles, CA 90005",
+    context: "likely_venue",
+    coordinates: { lat: 34.0615, lng: -118.3245 },
     label: "The Ebell of Los Angeles",
     neighborhood: "Mid-Wilshire",
   },
   {
     address: "665 W Jefferson Blvd, Los Angeles, CA 90007",
+    context: "likely_venue",
+    coordinates: { lat: 34.0238, lng: -118.2819 },
     label: "Shrine Auditorium & Expo Hall",
     neighborhood: "University Park",
   },
   {
     address: "7001 Franklin Ave, Hollywood, CA 90028",
+    context: "likely_venue",
+    coordinates: { lat: 34.1041, lng: -118.3417 },
     label: "The Magic Castle",
     neighborhood: "Hollywood",
   },
   {
     address: "2651 S La Cienega Blvd, Los Angeles, CA 90034",
+    context: "likely_venue",
+    coordinates: { lat: 34.0332, lng: -118.3769 },
     label: "SmogShoppe",
     neighborhood: "Culver City",
   },
   {
-    address: "Los Angeles, CA",
-    label: "Home or private address",
+    address: "123 Maple Ave, Los Angeles, CA 90004",
+    context: "likely_home",
+    coordinates: { lat: 34.0762, lng: -118.3091 },
+    label: "Private residence",
     neighborhood: "Los Angeles",
   },
 ];
@@ -78,7 +93,7 @@ export function AddressAutocomplete({
           onChange={(event) => onChange(event.target.value)}
           onFocus={() => setIsFocused(true)}
           placeholder="Start typing a venue or address"
-          className="mt-2 h-12 w-full rounded-2xl border border-neutral-300 px-4 text-sm font-semibold outline-none transition focus:border-neutral-950"
+          className="mt-2 h-14 w-full rounded-[22px] border border-neutral-200 bg-white px-4 text-sm font-semibold outline-none shadow-[0_12px_34px_rgba(20,20,20,0.05)] transition focus:border-neutral-950"
         />
       </label>
 
@@ -90,7 +105,7 @@ export function AddressAutocomplete({
               type="button"
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => onSelect(suggestion)}
-              className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-[#f7f7f5]"
+              className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left transition hover:-translate-y-0.5 hover:bg-[#f7f7f5]"
             >
               <span>
                 <span className="block text-sm font-semibold text-neutral-950">
@@ -100,7 +115,7 @@ export function AddressAutocomplete({
                   {suggestion.address}
                 </span>
               </span>
-              <span className="shrink-0 rounded-full bg-neutral-100 px-3 py-1 text-xs font-semibold text-neutral-600">
+              <span className="shrink-0 rounded-full bg-neutral-950 px-3 py-1 text-xs font-semibold text-white">
                 Use
               </span>
             </button>
@@ -109,15 +124,18 @@ export function AddressAutocomplete({
       ) : null}
 
       {selectedAddress ? (
-        <div className="mt-3 rounded-2xl border border-neutral-200 bg-[#fbfbfa] p-4">
+        <div className="mt-4 rounded-[24px] border border-neutral-200 bg-white p-4 shadow-[0_18px_48px_rgba(20,20,20,0.06)]">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-neutral-400">
             Selected address
           </p>
           <p className="mt-1 text-sm font-semibold text-neutral-800">
             {selectedAddress}
           </p>
-          <div className="mt-3 h-28 overflow-hidden rounded-2xl bg-[linear-gradient(135deg,#ece7df,#f7f7f5)]">
-            <div className="h-full w-full bg-[linear-gradient(90deg,rgba(255,255,255,0.42)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.42)_1px,transparent_1px)] bg-[size:28px_28px]" />
+          <div className="relative mt-3 h-36 overflow-hidden rounded-2xl bg-[linear-gradient(135deg,#e9eee8,#f7f3ed)]">
+            <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.45)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.45)_1px,transparent_1px)] bg-[size:30px_30px]" />
+            <div className="absolute left-1/2 top-1/2 flex h-10 w-10 -translate-x-1/2 -translate-y-full items-center justify-center rounded-full bg-neutral-950 text-sm font-semibold text-white shadow-[0_18px_42px_rgba(20,20,20,0.28)]">
+              A
+            </div>
           </div>
         </div>
       ) : null}

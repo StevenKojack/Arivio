@@ -23,7 +23,7 @@ export function MarketplaceRow({
   }
 
   return (
-    <section className="min-w-0 rounded-[30px] border border-neutral-200 bg-white p-5 shadow-[0_18px_50px_rgba(20,20,20,0.05)] transition duration-200 ease-out hover:shadow-[0_22px_64px_rgba(20,20,20,0.08)]">
+    <section className="min-w-0 rounded-[32px] border border-neutral-200 bg-[linear-gradient(135deg,#ffffff,#fbfbfa)] p-5 shadow-[0_20px_60px_rgba(20,20,20,0.06)] transition duration-200 ease-out hover:shadow-[0_26px_78px_rgba(20,20,20,0.1)]">
       <div className="flex items-end justify-between gap-4">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight text-neutral-950">

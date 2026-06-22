@@ -15,7 +15,7 @@ const steps = [
 
 export function HowItWorks() {
   return (
-    <section className="bg-[#f7f7f5] px-6 py-20 sm:px-8 lg:px-12">
+    <section className="bg-[linear-gradient(180deg,#f4f1ec,#ffffff)] px-6 py-24 sm:px-8 lg:px-12">
       <div className="mx-auto max-w-7xl">
         <div className="max-w-2xl">
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#e24b44]">
@@ -25,13 +25,13 @@ export function HowItWorks() {
             From idea to booked, without losing the thread.
           </h2>
         </div>
-        <div className="mt-10 grid gap-4 md:grid-cols-3">
+        <div className="mt-10 grid gap-5 md:grid-cols-3">
           {steps.map((step, index) => (
             <article
               key={step.title}
-              className="rounded-lg border border-neutral-200 bg-white p-6"
+              className="group rounded-[30px] border border-neutral-200 bg-white/90 p-6 shadow-[0_20px_60px_rgba(20,20,20,0.06)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_28px_80px_rgba(20,20,20,0.1)]"
             >
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-neutral-950 text-sm font-semibold text-white">
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-neutral-950 text-sm font-semibold text-white shadow-[0_14px_34px_rgba(20,20,20,0.18)] transition group-hover:scale-105">
                 {index + 1}
               </span>
               <h3 className="mt-8 text-xl font-semibold text-neutral-950">
