@@ -4,18 +4,24 @@ import type { MarketplaceItem } from "@/app/data/marketplace";
 
 type VendorCardProps = {
   buttonLabel?: string;
+  isHighlighted?: boolean;
   item: MarketplaceItem;
   matchLabel?: string;
   matchReason?: string;
   quote: number;
   onAdd: (item: MarketplaceItem) => void;
+  onHover?: (itemId: number | null) => void;
+  onSelect?: (item: MarketplaceItem) => void;
 };
 
 export function VendorCard({
   buttonLabel = "Add to quote",
+  isHighlighted = false,
   item,
   matchLabel = "Good match",
   matchReason = "Fits your event details and timing.",
+  onHover,
+  onSelect,
   quote,
   onAdd,
 }: VendorCardProps) {
@@ -26,7 +32,24 @@ export function VendorCard({
   ].slice(0, 3);
 
   return (
-    <article className="w-[min(78vw,292px)] shrink-0 snap-start overflow-hidden rounded-[26px] border border-neutral-200 bg-white shadow-[0_14px_38px_rgba(20,20,20,0.06)] transition duration-300 ease-out hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(20,20,20,0.12)]">
+    <article
+      onClick={() => onSelect?.(item)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect?.(item);
+        }
+      }}
+      onMouseEnter={() => onHover?.(item.id)}
+      onMouseLeave={() => onHover?.(null)}
+      role="button"
+      tabIndex={0}
+      className={`w-[min(78vw,292px)] shrink-0 snap-start overflow-hidden rounded-[26px] border bg-white shadow-[0_14px_38px_rgba(20,20,20,0.06)] transition duration-300 ease-out hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(20,20,20,0.12)] ${
+        isHighlighted
+          ? "border-neutral-950 ring-4 ring-neutral-950/10"
+          : "border-neutral-200"
+      }`}
+    >
       <div className="relative h-40 overflow-hidden bg-[#f2f0ec]">
         <div
           className={`h-full bg-cover bg-center transition duration-500 hover:scale-105 ${
@@ -79,7 +102,10 @@ export function VendorCard({
           </div>
           <button
             type="button"
-            onClick={() => onAdd(item)}
+            onClick={(event) => {
+              event.stopPropagation();
+              onAdd(item);
+            }}
             className="h-10 rounded-full bg-neutral-950 px-4 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-neutral-800"
           >
             {buttonLabel}

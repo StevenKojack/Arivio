@@ -4,18 +4,28 @@ import { quoteItem, type MarketplaceItem, type QuoteContext } from "@/app/data/m
 import { VendorCard } from "./VendorCard";
 
 type MarketplaceRowProps = {
+  activeItemId?: number | null;
   description?: string;
+  hoveredItemId?: number | null;
   items: MarketplaceItem[];
   quoteContext: QuoteContext;
+  rowId: string;
   title: string;
   onAdd: (item: MarketplaceItem) => void;
+  onHoverItem?: (itemId: number | null) => void;
+  onSelectItem?: (item: MarketplaceItem) => void;
 };
 
 export function MarketplaceRow({
+  activeItemId,
   description,
+  hoveredItemId,
   items,
   onAdd,
+  onHoverItem,
+  onSelectItem,
   quoteContext,
+  rowId,
   title,
 }: MarketplaceRowProps) {
   if (!items.length) {
@@ -39,14 +49,18 @@ export function MarketplaceRow({
       </div>
       <div className="mt-5 flex min-w-0 snap-x gap-4 overflow-x-auto overscroll-x-contain scroll-smooth pb-3 [scrollbar-width:thin]">
         {items.map((item, index) => (
-          <VendorCard
-            key={`${title}-${item.id}`}
-            item={item}
-            matchLabel={index < 3 ? "Top match" : "Match"}
-            matchReason={getMatchReason(title, item)}
-            quote={quoteItem(item, quoteContext)}
-            onAdd={onAdd}
-          />
+          <div key={`${title}-${item.id}`} id={`vendor-card-${item.id}`} data-row-id={rowId}>
+            <VendorCard
+              isHighlighted={hoveredItemId === item.id || activeItemId === item.id}
+              item={item}
+              matchLabel={index < 3 ? "Top match" : "Match"}
+              matchReason={getMatchReason(title, item)}
+              quote={quoteItem(item, quoteContext)}
+              onAdd={onAdd}
+              onHover={onHoverItem}
+              onSelect={onSelectItem}
+            />
+          </div>
         ))}
       </div>
     </section>

@@ -36,6 +36,7 @@ import {
 import { ensureCurrentProfile } from "@/lib/repositories/profilesRepository";
 import { requestQuotesFromCart } from "@/lib/services/quoteService";
 import { FilterDrawer } from "./components/FilterDrawer";
+import { MarketplaceMap, type MarketplaceMapPin } from "./components/MarketplaceMap";
 import { MarketplaceRow } from "./components/MarketplaceRow";
 import { QuoteCartDrawer } from "./components/QuoteCartDrawer";
 
@@ -108,14 +109,12 @@ export function MarketplaceBrowser() {
   const [homeAreaName, setHomeAreaName] = useState(homeAreas[0].name);
   const [liveCoordinates, setLiveCoordinates] = useState<Coordinates | null>(null);
   const [locationStatus, setLocationStatus] = useState("");
-  const [selectedVenueId, setSelectedVenueId] = useState<number | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [cartMessage, setCartMessage] = useState("");
+  const [activeRowId, setActiveRowId] = useState("best-matches");
+  const [hoveredItemId, setHoveredItemId] = useState<number | null>(null);
+  const [selectedMapItemId, setSelectedMapItemId] = useState<number | null>(null);
   const [isRequestingQuotes, setIsRequestingQuotes] = useState(false);
-  const venueItems = useMemo(
-    () => providers.filter((item) => item.type === "Venue"),
-    [providers],
-  );
   const durationHours = getHoursBetween(startTime, endTime);
   const globalQuoteContext: QuoteContext = useMemo(
     () => ({
@@ -127,24 +126,19 @@ export function MarketplaceBrowser() {
     }),
     [durationHours, endTime, eventDate, guestCount, startTime],
   );
-  const selectedVenue = selectedVenueId
-    ? venueItems.find((venue) => venue.id === selectedVenueId)
-    : undefined;
   const homeArea = homeAreas.find((area) => area.name === homeAreaName) ?? homeAreas[0];
   const homeCoordinates = liveCoordinates ?? homeArea.coordinates;
   const eventCoordinates: Coordinates | undefined = useMemo(
     () =>
       useHomeVenue
         ? homeCoordinates
-        : selectedVenue?.coordinates ??
-          (savedEvent?.latitude && savedEvent.longitude
+        : savedEvent?.latitude && savedEvent.longitude
             ? { lat: savedEvent.latitude, lng: savedEvent.longitude }
-            : undefined),
+            : undefined,
     [
       homeCoordinates,
       savedEvent?.latitude,
       savedEvent?.longitude,
-      selectedVenue?.coordinates,
       useHomeVenue,
     ],
   );
@@ -187,7 +181,7 @@ export function MarketplaceBrowser() {
     .join(" - ");
   const eventLocationLabel = useHomeVenue
     ? homeAddress || homeAreaName
-    : selectedVenue?.name || initialLocation || "Not selected";
+    : initialLocation || savedEvent?.city || "Not selected";
   const serviceSummary = selectedServices.length
     ? selectedServices.slice(0, 4).join(", ")
     : "Open to suggestions";
@@ -272,6 +266,31 @@ export function MarketplaceBrowser() {
     () => buildMarketplaceRows(filteredItems),
     [filteredItems],
   );
+  const activeRow = marketplaceRows.find((row) => row.id === activeRowId) ?? marketplaceRows[0];
+  const cartedIds = cart.map((line) => line.item.id);
+  const mapPins = useMemo<MarketplaceMapPin[]>(() => {
+    const activeItems = activeRow?.items ?? [];
+    const activeIds = new Set(activeItems.map((item) => item.id));
+    const pinMap = new Map<number, MarketplaceMapPin>();
+
+    activeItems.forEach((item) => {
+      pinMap.set(item.id, {
+        isActiveRowMatch: true,
+        isCarted: cartedIds.includes(item.id),
+        item,
+      });
+    });
+
+    cart.forEach((line) => {
+      pinMap.set(line.item.id, {
+        isActiveRowMatch: activeIds.has(line.item.id),
+        isCarted: true,
+        item: line.item,
+      });
+    });
+
+    return Array.from(pinMap.values());
+  }, [activeRow, cart, cartedIds]);
 
   useEffect(() => {
     async function loadMarketplace() {
@@ -334,6 +353,34 @@ export function MarketplaceBrowser() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
 
+  useEffect(() => {
+    if (!marketplaceRows.length) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visibleEntry = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        const rowId = visibleEntry?.target.getAttribute("data-marketplace-row");
+
+        if (rowId) {
+          setActiveRowId(rowId);
+        }
+      },
+      {
+        rootMargin: "-20% 0px -55% 0px",
+        threshold: [0.25, 0.45, 0.65],
+      },
+    );
+
+    const rowElements = document.querySelectorAll("[data-marketplace-row]");
+    rowElements.forEach((element) => observer.observe(element));
+
+    return () => observer.disconnect();
+  }, [marketplaceRows]);
+
   function getLineContext(line: CartLine): QuoteContext {
     return {
       date: eventDate,
@@ -362,7 +409,6 @@ export function MarketplaceBrowser() {
     setSelectedServices(
       nextEvent === "All" ? [] : eventPlanPresets[nextEvent].recommended,
     );
-    setSelectedVenueId(null);
   }
 
   function useCurrentLocation() {
@@ -468,6 +514,17 @@ export function MarketplaceBrowser() {
     setCart((current) => current.filter((line) => line.item.id !== itemId));
   }
 
+  function selectMapItem(item: MarketplaceItem) {
+    setSelectedMapItemId(item.id);
+    const card = document.getElementById(`vendor-card-${item.id}`);
+
+    card?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "center",
+    });
+  }
+
   async function updateCartTime(
     itemId: number,
     field: "serviceStart" | "serviceEnd",
@@ -563,128 +620,59 @@ export function MarketplaceBrowser() {
 
   return (
     <>
-      <div className="grid min-w-0 gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="min-w-0 space-y-6">
-          <section className="rounded-[32px] border border-neutral-200 bg-[linear-gradient(135deg,#ffffff,#fbfbfa)] p-5 shadow-[0_18px_50px_rgba(20,20,20,0.05)]">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-neutral-500">
-                  Event context
-                </p>
-                <h2 className="mt-2 text-3xl font-semibold tracking-tight text-neutral-950">
-                  {planSummary ? `Best matches for ${planSummary}` : "Vendor collections"}
-                </h2>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-600">
-                  {marketplaceMessage}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsFilterDrawerOpen(true)}
-                className="h-11 w-fit rounded-full border border-neutral-300 bg-white px-5 text-sm font-semibold text-neutral-950 transition hover:-translate-y-0.5 hover:border-neutral-950"
-              >
-                Edit event details
-              </button>
-            </div>
-            <div className="mt-5 grid gap-3 text-sm text-neutral-600 md:grid-cols-5">
-              <SummaryPill label="Date" value={eventDate || "Choose date"} />
-              <SummaryPill label="Time" value={`${startTime} - ${endTime}`} />
-              <SummaryPill label="Guests" value={guestCount.toLocaleString()} />
-              <SummaryPill label="Location" value={eventLocationLabel} />
-              <SummaryPill label="Services" value={serviceSummary} />
-            </div>
-            {initialNotes ? (
-              <p className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-neutral-700 shadow-[inset_0_0_0_1px_rgba(229,229,229,1)]">
-                Added details: {initialNotes}
-              </p>
-            ) : null}
-          </section>
-
-          <section className="grid min-w-0 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
-            <div className="rounded-[28px] border border-neutral-200 bg-white p-5">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-neutral-950">Location context</p>
-                  <p className="mt-1 text-sm text-neutral-600">
-                    Used for distance estimates only.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setUseHomeVenue((current) => !current)}
-                  className={`h-10 rounded-full px-4 text-sm font-semibold transition ${
-                    useHomeVenue
-                      ? "bg-neutral-950 text-white"
-                      : "border border-neutral-300 bg-white text-neutral-800"
-                  }`}
-                >
-                  My home
-                </button>
-              </div>
-              {useHomeVenue ? (
-                <div className="mt-4 grid gap-3">
-                  <input
-                    value={homeAddress}
-                    onChange={(event) => setHomeAddress(event.target.value)}
-                    placeholder="Home address"
-                    className="h-11 rounded-2xl border border-neutral-300 px-3 text-sm font-semibold text-neutral-900 outline-none focus:border-neutral-950"
-                  />
-                  <button
-                    type="button"
-                    onClick={useCurrentLocation}
-                    className="h-11 rounded-full bg-neutral-950 px-4 text-sm font-semibold text-white transition hover:bg-neutral-800"
-                  >
-                    Use live location
-                  </button>
-                  {locationStatus ? (
-                    <p className="text-xs font-semibold text-neutral-600">{locationStatus}</p>
-                  ) : null}
-                </div>
-              ) : (
-                <select
-                  value={selectedVenueId ?? ""}
-                  onChange={(event) =>
-                    setSelectedVenueId(event.target.value ? Number(event.target.value) : null)
-                  }
-                  className="mt-4 h-11 w-full rounded-2xl border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-900 outline-none focus:border-neutral-950"
-                >
-                  <option value="">Select a venue</option>
-                  {venueItems.map((venue) => (
-                    <option key={venue.id} value={venue.id}>
-                      {venue.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-            <VenueMap
-              selectedVenueId={selectedVenueId}
-              useHomeVenue={useHomeVenue}
-              homeCoordinates={homeCoordinates}
-              venues={venueItems}
-              onSelectVenue={setSelectedVenueId}
-            />
-          </section>
-
-          <LocationEstimatePanel
-            eventCoordinates={eventCoordinates}
+      <div className="grid min-w-0 gap-6 2xl:grid-cols-[minmax(380px,0.9fr)_minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="min-w-0 space-y-5 2xl:order-none xl:col-span-1">
+          <EventContextPanel
+            eventDate={eventDate}
+            eventLocationLabel={eventLocationLabel}
+            guestCount={guestCount}
+            initialNotes={initialNotes}
+            marketplaceMessage={marketplaceMessage}
+            planSummary={planSummary}
+            serviceSummary={serviceSummary}
+            startTime={startTime}
+            endTime={endTime}
+            useHomeVenue={useHomeVenue}
             homeAddress={homeAddress}
-            isHomeVenue={useHomeVenue}
-            providerEstimates={providerEstimates}
-            selectedVenueName={selectedVenue?.name}
+            locationStatus={locationStatus}
+            providerCount={providerEstimates.length}
+            onHomeAddressChange={setHomeAddress}
+            onOpenFilters={() => setIsFilterDrawerOpen(true)}
+            onToggleHomeVenue={() => setUseHomeVenue((current) => !current)}
+            onUseCurrentLocation={useCurrentLocation}
           />
+
+          <MarketplaceMap
+            activeCategory={activeRow?.title ?? "Best matches"}
+            cartedIds={cartedIds}
+            eventCoordinates={eventCoordinates}
+            hoveredItemId={hoveredItemId}
+            pins={mapPins}
+            selectedItemId={selectedMapItemId}
+            onHoverItem={setHoveredItemId}
+            onSelectItem={selectMapItem}
+          />
+        </div>
+
+        <div className="min-w-0 space-y-6 xl:col-span-1">
 
           {marketplaceRows.length ? (
             <div className="space-y-6 animate-[fadeUp_280ms_ease-out]">
               {marketplaceRows.map((row) => (
-                <MarketplaceRow
-                  key={row.title}
-                  title={row.title}
-                  description={row.description}
-                  items={row.items}
-                  quoteContext={globalQuoteContext}
-                  onAdd={addToCart}
-                />
+                <div key={row.id} data-marketplace-row={row.id}>
+                  <MarketplaceRow
+                    activeItemId={selectedMapItemId}
+                    hoveredItemId={hoveredItemId}
+                    rowId={row.id}
+                    title={row.title}
+                    description={row.description}
+                    items={row.items}
+                    quoteContext={globalQuoteContext}
+                    onAdd={addToCart}
+                    onHoverItem={setHoveredItemId}
+                    onSelectItem={(item) => setSelectedMapItemId(item.id)}
+                  />
+                </div>
               ))}
             </div>
           ) : (
@@ -699,17 +687,19 @@ export function MarketplaceBrowser() {
           )}
         </div>
 
-        <QuoteCartDrawer
-          canSaveCart={canSaveCart}
-          cart={cart}
-          cartMessage={cartMessage}
-          eventSummary={`${eventDate || "Choose a date"} from ${startTime} to ${endTime}`}
-          getLineQuote={getLineQuote}
-          isRequestingQuotes={isRequestingQuotes}
-          onRemove={removeFromCart}
-          onRequestQuotes={requestQuotes}
-          onUpdateTime={updateCartTime}
-        />
+        <div className="min-w-0 xl:col-span-1">
+          <QuoteCartDrawer
+            canSaveCart={canSaveCart}
+            cart={cart}
+            cartMessage={cartMessage}
+            eventSummary={`${eventDate || "Choose a date"} from ${startTime} to ${endTime}`}
+            getLineQuote={getLineQuote}
+            isRequestingQuotes={isRequestingQuotes}
+            onRemove={removeFromCart}
+            onRequestQuotes={requestQuotes}
+            onUpdateTime={updateCartTime}
+          />
+        </div>
       </div>
 
       <FilterDrawer
@@ -730,9 +720,132 @@ export function MarketplaceBrowser() {
 
 type MarketplaceRowGroup = {
   description: string;
+  id: string;
   items: MarketplaceItem[];
   title: string;
 };
+
+function EventContextPanel({
+  endTime,
+  eventDate,
+  eventLocationLabel,
+  guestCount,
+  homeAddress,
+  initialNotes,
+  locationStatus,
+  marketplaceMessage,
+  planSummary,
+  providerCount,
+  serviceSummary,
+  startTime,
+  useHomeVenue,
+  onHomeAddressChange,
+  onOpenFilters,
+  onToggleHomeVenue,
+  onUseCurrentLocation,
+}: {
+  endTime: string;
+  eventDate: string;
+  eventLocationLabel: string;
+  guestCount: number;
+  homeAddress: string;
+  initialNotes: string;
+  locationStatus: string;
+  marketplaceMessage: string;
+  planSummary: string;
+  providerCount: number;
+  serviceSummary: string;
+  startTime: string;
+  useHomeVenue: boolean;
+  onHomeAddressChange: (value: string) => void;
+  onOpenFilters: () => void;
+  onToggleHomeVenue: () => void;
+  onUseCurrentLocation: () => void;
+}) {
+  return (
+    <section className="rounded-[34px] border border-neutral-200 bg-[linear-gradient(135deg,#ffffff,#fbfbfa)] p-5 shadow-[0_22px_70px_rgba(20,20,20,0.08)]">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
+            Event command center
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">
+            {planSummary || "Vendor marketplace"}
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-neutral-600">
+            {marketplaceMessage}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onOpenFilters}
+          className="shrink-0 rounded-full border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-950 transition hover:-translate-y-0.5 hover:border-neutral-950"
+        >
+          Refine
+        </button>
+      </div>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <SummaryPill label="Date" value={eventDate || "Choose date"} />
+        <SummaryPill label="Time" value={`${startTime} - ${endTime}`} />
+        <SummaryPill label="Guests" value={guestCount.toLocaleString()} />
+        <SummaryPill label="Location" value={eventLocationLabel} />
+        <SummaryPill label="Services" value={serviceSummary} />
+        <SummaryPill label="Nearby" value={`${providerCount} within range`} />
+      </div>
+
+      {initialNotes ? (
+        <p className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-neutral-700 shadow-[inset_0_0_0_1px_rgba(229,229,229,1)]">
+          Added details: {initialNotes}
+        </p>
+      ) : null}
+
+      <div className="mt-5 rounded-3xl border border-neutral-200 bg-white p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-neutral-950">
+              Anchor the map
+            </p>
+            <p className="mt-1 text-xs leading-5 text-neutral-500">
+              Use a home or event address to keep provider distance realistic.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onToggleHomeVenue}
+            className={`rounded-full px-4 py-2 text-sm font-semibold transition hover:-translate-y-0.5 ${
+              useHomeVenue
+                ? "bg-neutral-950 text-white"
+                : "border border-neutral-300 bg-white text-neutral-800"
+            }`}
+          >
+            {useHomeVenue ? "Using address" : "Use address"}
+          </button>
+        </div>
+        {useHomeVenue ? (
+          <div className="mt-4 grid gap-3">
+            <input
+              value={homeAddress}
+              onChange={(event) => onHomeAddressChange(event.target.value)}
+              placeholder="Home or event address"
+              className="h-11 rounded-2xl border border-neutral-300 px-3 text-sm font-semibold text-neutral-900 outline-none focus:border-neutral-950"
+            />
+            <button
+              type="button"
+              onClick={onUseCurrentLocation}
+              className="h-11 rounded-full bg-neutral-950 px-4 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-neutral-800"
+            >
+              Use current location
+            </button>
+            {locationStatus ? (
+              <p className="text-xs font-semibold text-neutral-600">{locationStatus}</p>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
 
 function SummaryPill({ label, value }: { label: string; value: string }) {
   return (
@@ -749,56 +862,67 @@ function buildMarketplaceRows(items: MarketplaceItem[]): MarketplaceRowGroup[] {
   const rows: MarketplaceRowGroup[] = [
     {
       description: "The strongest matches based on your event details.",
+      id: "best-matches",
       items: items.slice(0, 10),
       title: "Best matches",
     },
     {
       description: "Spaces and venues for the event itself.",
+      id: "venues",
       items: byServices(items, ["Venue"]),
       title: "Venues",
     },
     {
       description: "Food, catering, cake, and dessert options.",
+      id: "food-catering",
       items: byServices(items, ["Catering", "Cake & Desserts"]),
       title: "Food and catering",
     },
     {
       description: "DJs, live music, and sound-forward services.",
+      id: "music-djs",
       items: byServices(items, ["DJ", "Live Music"]),
       title: "Music and DJs",
     },
     {
       description: "Tables, chairs, lounge, booths, and event equipment.",
+      id: "rentals",
       items: byServices(items, ["Rentals", "Booth Rentals"]),
       title: "Rentals",
     },
     {
       description: "Photographers, booths, and visual coverage.",
+      id: "photo-video",
       items: byServices(items, ["Photography", "Photo Booth"]),
       title: "Photo and video",
     },
     {
       description: "Performers and specialty entertainment when appropriate.",
+      id: "entertainment",
       items: byServices(items, ["Magic", "Character Performers"]),
       title: "Entertainment",
     },
     {
       description: "Florals, invitations, programs, and presentation details.",
+      id: "decor",
       items: byServices(items, ["Florals", "Invitations", "Printed Programs", "Printed Materials"]),
       title: "Decor",
     },
     {
       description: "Support teams for guest flow and event operations.",
+      id: "security-staffing",
       items: byServices(items, ["Staffing", "Security", "Registration"]),
       title: "Security and staffing",
     },
     {
       description: "Restrooms, production, livestreaming, and practical event support.",
+      id: "restrooms-logistics",
       items: byServices(items, ["Portable Restrooms", "AV Production", "Live Streaming"]),
       title: "Restrooms and logistics",
     },
     {
       description: "Passenger movement, shuttles, and point-to-point event transport.",
+      id: "transportation",
       items: byServices(items, ["Transportation"]),
       title: "Transportation",
     },
@@ -812,151 +936,5 @@ function byServices(items: MarketplaceItem[], services: ServiceName[]) {
     (item) =>
       services.includes(item.type) ||
       item.services.some((service) => services.includes(service)),
-  );
-}
-
-type VenueMapProps = {
-  homeCoordinates: Coordinates;
-  onSelectVenue: (id: number) => void;
-  selectedVenueId: number | null;
-  useHomeVenue: boolean;
-  venues: MarketplaceItem[];
-};
-
-type ProviderEstimate = {
-  driveMinutes: number;
-  item: MarketplaceItem;
-  miles: number;
-};
-
-function LocationEstimatePanel({
-  eventCoordinates,
-  homeAddress,
-  isHomeVenue,
-  providerEstimates,
-  selectedVenueName,
-}: {
-  eventCoordinates?: Coordinates;
-  homeAddress: string;
-  isHomeVenue: boolean;
-  providerEstimates: ProviderEstimate[];
-  selectedVenueName?: string;
-}) {
-  const closestProvider = providerEstimates[0];
-  const longestDrive = providerEstimates[providerEstimates.length - 1];
-
-  return (
-    <section className="mt-4 grid gap-3 rounded-lg border border-neutral-200 bg-neutral-950 p-4 text-white md:grid-cols-4">
-      <div className="md:col-span-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#ff8b8f]">
-          Live location estimate
-        </p>
-        <p className="mt-2 text-sm text-neutral-300">
-          {eventCoordinates
-            ? isHomeVenue
-              ? homeAddress || "Home venue location selected"
-              : selectedVenueName ?? "Venue selected"
-            : "Select a venue or use live location to start estimating."}
-        </p>
-      </div>
-      <EstimateMetric
-        label="Providers within 1 hour"
-        value={eventCoordinates ? String(providerEstimates.length) : "0"}
-      />
-      <EstimateMetric
-        label="Closest provider"
-        value={closestProvider ? `${closestProvider.driveMinutes} min` : "--"}
-        detail={closestProvider?.item.name}
-      />
-      <div className="rounded-lg border border-white/10 p-3 md:col-span-4">
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <p className="text-sm text-neutral-300">
-            Normal traffic estimate uses local coordinates until a routing API is connected.
-          </p>
-          <p className="text-sm font-semibold text-white">
-            Farthest shown: {longestDrive ? `${longestDrive.driveMinutes} min` : "--"}
-          </p>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function EstimateMetric({
-  detail,
-  label,
-  value,
-}: {
-  detail?: string;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-lg border border-white/10 p-3">
-      <p className="text-xs text-neutral-400">{label}</p>
-      <p className="mt-1 text-2xl font-semibold">{value}</p>
-      {detail ? <p className="mt-1 text-xs text-neutral-400">{detail}</p> : null}
-    </div>
-  );
-}
-
-function VenueMap({
-  homeCoordinates,
-  onSelectVenue,
-  selectedVenueId,
-  useHomeVenue,
-  venues,
-}: VenueMapProps) {
-  const points = useHomeVenue
-    ? [{ id: 0, name: "Home venue", coordinates: homeCoordinates }]
-    : venues;
-  const lats = points.map((point) => point.coordinates.lat);
-  const lngs = points.map((point) => point.coordinates.lng);
-  const minLat = lats.length ? Math.min(...lats) : 34.02;
-  const maxLat = lats.length ? Math.max(...lats) : 34.12;
-  const minLng = lngs.length ? Math.min(...lngs) : -118.45;
-  const maxLng = lngs.length ? Math.max(...lngs) : -118.2;
-
-  function toPosition(point: Coordinates) {
-    const x = ((point.lng - minLng) / Math.max(maxLng - minLng, 0.01)) * 74 + 13;
-    const y = 87 - ((point.lat - minLat) / Math.max(maxLat - minLat, 0.01)) * 74;
-
-    return { x, y };
-  }
-
-  return (
-    <div className="relative min-h-[420px] overflow-hidden rounded-lg border border-neutral-200 bg-[#eef3ef] p-4 shadow-inner">
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.42)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.42)_1px,transparent_1px)] bg-[size:36px_36px]" />
-      <div className="absolute left-4 top-4 z-10 rounded-full bg-white px-3 py-1 text-xs font-semibold text-neutral-700 shadow">
-        Venue map
-      </div>
-      <div className="absolute bottom-4 left-4 z-10 max-w-[70%] rounded-lg bg-white/90 px-3 py-2 text-xs font-medium text-neutral-600 shadow">
-        Map is a local prototype view. Pins use stored coordinates.
-      </div>
-      {points.length ? (
-        points.map((point) => {
-          const position = toPosition(point.coordinates);
-          const isSelected = point.id === selectedVenueId || useHomeVenue;
-
-          return (
-            <button
-              key={point.id}
-              type="button"
-              onClick={() => !useHomeVenue && onSelectVenue(point.id)}
-              className={`absolute z-20 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white px-3 py-2 text-xs font-semibold shadow-[0_12px_30px_rgba(20,20,20,0.2)] transition hover:-translate-y-[55%] ${
-                isSelected ? "bg-[#ff5a5f] text-white" : "bg-neutral-950 text-white"
-              }`}
-              style={{ left: `${position.x}%`, top: `${position.y}%` }}
-            >
-              {point.name}
-            </button>
-          );
-        })
-      ) : (
-        <div className="absolute inset-0 z-10 flex items-center justify-center px-6 text-center text-sm font-semibold text-neutral-600">
-          Add approved venue providers to Supabase to populate the map.
-        </div>
-      )}
-    </div>
   );
 }
