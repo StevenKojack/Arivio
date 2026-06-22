@@ -18,6 +18,8 @@ export type ServiceName =
   | "Live Music"
   | "Magic"
   | "Character Performers"
+  | "Balloons"
+  | "Bounce Houses"
   | "Photo Booth"
   | "Rentals"
   | "Invitations"
@@ -29,8 +31,12 @@ export type ServiceName =
   | "Printed Programs"
   | "Live Streaming"
   | "Transportation"
+  | "Party Bus"
+  | "Valet"
   | "Security"
   | "Staffing"
+  | "Bartending"
+  | "Cleaning"
   | "Booth Rentals"
   | "Portable Restrooms";
 
@@ -150,6 +156,8 @@ export const entertainmentServices: ServiceName[] = [
   "Live Music",
   "Magic",
   "Character Performers",
+  "Balloons",
+  "Bounce Houses",
   "Photo Booth",
 ];
 
@@ -168,8 +176,12 @@ export const allServices: ServiceName[] = [
   "Printed Programs",
   "Live Streaming",
   "Transportation",
+  "Party Bus",
+  "Valet",
   "Security",
   "Staffing",
+  "Bartending",
+  "Cleaning",
   "Booth Rentals",
   "Portable Restrooms",
 ];
@@ -187,7 +199,15 @@ export const eventPlanPresets: Record<EventType, EventPlanPreset> = {
       "Invitations",
       "Photography",
     ],
-    more: ["Live Music", "Photo Booth", "Florals", "AV Production", "Staffing"],
+    more: [
+      "Live Music",
+      "Photo Booth",
+      "Balloons",
+      "Bounce Houses",
+      "Florals",
+      "AV Production",
+      "Staffing",
+    ],
   },
   Wedding: {
     recommended: [
@@ -200,7 +220,15 @@ export const eventPlanPresets: Record<EventType, EventPlanPreset> = {
       "Live Music",
       "DJ",
     ],
-    more: ["Transportation", "AV Production", "Staffing", "Cake & Desserts"],
+    more: [
+      "Transportation",
+      "Party Bus",
+      "Valet",
+      "Bartending",
+      "AV Production",
+      "Staffing",
+      "Cake & Desserts",
+    ],
   },
   Graduation: {
     recommended: [
@@ -212,7 +240,7 @@ export const eventPlanPresets: Record<EventType, EventPlanPreset> = {
       "DJ",
       "Photo Booth",
     ],
-    more: ["Live Music", "AV Production", "Transportation", "Cake & Desserts"],
+    more: ["Live Music", "AV Production", "Transportation", "Party Bus", "Cake & Desserts", "Balloons"],
   },
   Corporate: {
     recommended: [
@@ -223,7 +251,15 @@ export const eventPlanPresets: Record<EventType, EventPlanPreset> = {
       "Photography",
       "Staffing",
     ],
-    more: ["Live Music", "DJ", "Photo Booth", "Transportation", "Registration", "Security"],
+    more: [
+      "Live Music",
+      "DJ",
+      "Photo Booth",
+      "Transportation",
+      "Valet",
+      "Registration",
+      "Security",
+    ],
   },
   Seminar: {
     recommended: [
@@ -233,7 +269,7 @@ export const eventPlanPresets: Record<EventType, EventPlanPreset> = {
       "Catering",
       "Printed Materials",
     ],
-    more: ["Photography", "Staffing", "Transportation", "Rentals"],
+    more: ["Photography", "Staffing", "Transportation", "Valet", "Rentals"],
   },
   Convention: {
     recommended: [
@@ -244,7 +280,16 @@ export const eventPlanPresets: Record<EventType, EventPlanPreset> = {
       "Staffing",
       "Catering",
     ],
-    more: ["Photography", "Transportation", "DJ", "Live Music", "Printed Materials", "Security"],
+    more: [
+      "Photography",
+      "Transportation",
+      "Valet",
+      "DJ",
+      "Live Music",
+      "Printed Materials",
+      "Security",
+      "Cleaning",
+    ],
   },
   Funeral: {
     recommended: [
@@ -255,7 +300,7 @@ export const eventPlanPresets: Record<EventType, EventPlanPreset> = {
       "Live Streaming",
       "Transportation",
     ],
-    more: ["Photography", "AV Production", "Rentals", "Live Music", "Staffing"],
+    more: ["Photography", "AV Production", "Rentals", "Live Music", "Staffing", "Valet"],
   },
   "Baby Shower": {
     recommended: [
@@ -267,7 +312,7 @@ export const eventPlanPresets: Record<EventType, EventPlanPreset> = {
       "Invitations",
       "Photography",
     ],
-    more: ["Magic", "Character Performers", "Photo Booth", "Transportation"],
+    more: ["Magic", "Character Performers", "Balloons", "Photo Booth", "Transportation"],
   },
   Fundraiser: {
     recommended: [
@@ -278,7 +323,16 @@ export const eventPlanPresets: Record<EventType, EventPlanPreset> = {
       "Live Music",
       "Staffing",
     ],
-    more: ["DJ", "Photography", "Florals", "Registration", "Printed Materials", "Security"],
+    more: [
+      "DJ",
+      "Photography",
+      "Florals",
+      "Registration",
+      "Printed Materials",
+      "Security",
+      "Valet",
+      "Cleaning",
+    ],
   },
   "Private Party": {
     recommended: [
@@ -290,7 +344,15 @@ export const eventPlanPresets: Record<EventType, EventPlanPreset> = {
       "Photography",
       "Invitations",
     ],
-    more: ["Magic", "Character Performers", "Photo Booth", "Florals", "Staffing"],
+    more: [
+      "Magic",
+      "Character Performers",
+      "Balloons",
+      "Photo Booth",
+      "Florals",
+      "Staffing",
+      "Bartending",
+    ],
   },
 };
 
@@ -1013,5 +1075,182 @@ export const marketplaceItems: MarketplaceItem[] = [
     sourceLabel: "Official site",
     sourceUrl: "https://classicpartyrentals.com/",
     tags: ["rentals", "tables", "chairs", "booth", "wedding", "party"],
+  },
+  {
+    id: 29,
+    name: "New Balloon Art",
+    type: "Balloons",
+    location: "Los Angeles, CA",
+    address: "Los Angeles, CA",
+    coordinates: { lat: 34.0764, lng: -118.2607 },
+    price: "$750 estimate",
+    rating: 4.7,
+    events: ["Birthday", "Baby Shower", "Private Party", "Fundraiser", "Corporate"],
+    services: ["Balloons", "Florals"],
+    description: "Los Angeles balloon installation studio for sculptural decor, photo moments, and kid-friendly celebrations.",
+    pricing: { kind: "flat", basePrice: 750, label: "balloon install estimate" },
+    availability: [{ days: [...everyDay], start: "08:00", end: "20:00" }],
+    averageResponseMinutes: 360,
+    budgetTier: "premium",
+    maxGuestCount: 500,
+    reviewCount: 80,
+    sourceLabel: "Official site",
+    sourceUrl: "http://newballoonart.com/",
+    tags: ["balloons", "decor", "birthday", "baby-shower", "installation"],
+  },
+  {
+    id: 30,
+    name: "Yelp - Los Angeles Bounce House Rentals",
+    type: "Bounce Houses",
+    location: "Los Angeles, CA",
+    address: "Los Angeles, CA",
+    coordinates: { lat: 34.0109, lng: -118.2913 },
+    price: "$325 estimate",
+    rating: 4.5,
+    events: ["Birthday", "Baby Shower", "Private Party", "Fundraiser"],
+    services: ["Bounce Houses", "Rentals"],
+    description: "Local bounce house rental discovery source for backyard birthdays, school events, and family parties.",
+    pricing: { kind: "flat", basePrice: 325, label: "inflatable rental estimate" },
+    availability: [{ days: [...everyDay], start: "08:00", end: "20:00" }],
+    averageResponseMinutes: 300,
+    budgetTier: "economy",
+    maxGuestCount: 160,
+    reviewCount: 95,
+    sourceLabel: "Yelp category",
+    sourceUrl: "https://www.yelp.com/search?find_desc=Bounce+House+Rentals&find_loc=Los+Angeles%2C+CA",
+    tags: ["bounce-house", "kids", "birthday", "backyard", "rentals"],
+  },
+  {
+    id: 31,
+    name: "Yelp - Los Angeles Mobile Bartenders",
+    type: "Bartending",
+    location: "Los Angeles, CA",
+    address: "Los Angeles, CA",
+    coordinates: { lat: 34.056, lng: -118.3725 },
+    price: "$65 / hour estimate",
+    rating: 4.6,
+    events: ["Wedding", "Corporate", "Fundraiser", "Private Party"],
+    services: ["Bartending", "Staffing"],
+    description: "Local mobile bartending discovery source for staffed bars, mixers, and guest-service support.",
+    pricing: { kind: "hourly", hourlyRate: 65, minHours: 4, setupFee: 150, label: "bartending staff estimate" },
+    availability: [{ days: [...everyDay], start: "10:00", end: "23:30" }],
+    averageResponseMinutes: 240,
+    budgetTier: "standard",
+    maxGuestCount: 450,
+    reviewCount: 110,
+    sourceLabel: "Yelp category",
+    sourceUrl: "https://www.yelp.com/search?find_desc=Mobile+Bartending+Service&find_loc=Los+Angeles%2C+CA",
+    tags: ["bartending", "bar-staff", "wedding", "private-party", "corporate"],
+  },
+  {
+    id: 32,
+    name: "Regent Parking",
+    type: "Valet",
+    location: "Los Angeles, CA",
+    address: "Los Angeles, CA",
+    coordinates: { lat: 34.0838, lng: -118.3537 },
+    price: "$95 / hour estimate",
+    rating: 4.6,
+    events: ["Wedding", "Corporate", "Fundraiser", "Convention", "Private Party"],
+    services: ["Valet", "Staffing"],
+    description: "Los Angeles valet operator reference for guest arrival flow, private events, restaurants, and hospitality.",
+    pricing: { kind: "hourly", hourlyRate: 95, minHours: 4, setupFee: 250, label: "valet team estimate" },
+    availability: [{ days: [...everyDay], start: "08:00", end: "23:30" }],
+    averageResponseMinutes: 240,
+    budgetTier: "premium",
+    maxGuestCount: 1000,
+    reviewCount: 70,
+    sourceLabel: "Company reference",
+    sourceUrl: "https://www.bonappetit.com/people/article/tips-from-the-valet-brad-saltzman",
+    tags: ["valet", "parking", "guest-arrival", "wedding", "corporate"],
+  },
+  {
+    id: 33,
+    name: "KLS Worldwide Chauffeured Services",
+    type: "Transportation",
+    location: "Los Angeles, CA",
+    address: "Los Angeles, CA",
+    coordinates: { lat: 33.9434, lng: -118.4081 },
+    price: "$145 / hour estimate",
+    rating: 4.7,
+    events: ["Wedding", "Corporate", "Fundraiser", "Private Party", "Graduation"],
+    services: ["Transportation"],
+    description: "Chauffeured transportation option for VIP guest movement, airport pickup, and event transfers.",
+    pricing: { kind: "hourly", hourlyRate: 145, minHours: 3, label: "chauffeured vehicle estimate" },
+    availability: [{ days: [...everyDay], start: "05:00", end: "23:30" }],
+    averageResponseMinutes: 180,
+    budgetTier: "premium",
+    maxGuestCount: 40,
+    reviewCount: 160,
+    sourceLabel: "Official site",
+    sourceUrl: "https://www.klsla.com/",
+    tags: ["transportation", "chauffeur", "vip", "airport", "wedding"],
+  },
+  {
+    id: 34,
+    name: "Yelp - Los Angeles Party Bus Rentals",
+    type: "Party Bus",
+    location: "Los Angeles, CA",
+    address: "Los Angeles, CA",
+    coordinates: { lat: 34.0428, lng: -118.3274 },
+    price: "$190 / hour estimate",
+    rating: 4.5,
+    events: ["Birthday", "Wedding", "Graduation", "Private Party", "Corporate"],
+    services: ["Party Bus", "Transportation"],
+    description: "Party bus discovery source for group movement between venues, photos, afterparties, and hotels.",
+    pricing: { kind: "hourly", hourlyRate: 190, minHours: 4, label: "party bus estimate" },
+    availability: [{ days: [...everyDay], start: "10:00", end: "23:30" }],
+    averageResponseMinutes: 300,
+    budgetTier: "standard",
+    maxGuestCount: 45,
+    reviewCount: 125,
+    sourceLabel: "Yelp category",
+    sourceUrl: "https://www.yelp.com/search?find_desc=Party+Bus+Rentals&find_loc=Los+Angeles%2C+CA",
+    tags: ["party-bus", "transportation", "birthday", "graduation", "afterparty"],
+  },
+  {
+    id: 35,
+    name: "Yelp - Los Angeles Event Cleaning",
+    type: "Cleaning",
+    location: "Los Angeles, CA",
+    address: "Los Angeles, CA",
+    coordinates: { lat: 34.0312, lng: -118.2508 },
+    price: "$55 / hour estimate",
+    rating: 4.5,
+    events: ["Corporate", "Convention", "Fundraiser", "Private Party", "Graduation"],
+    services: ["Cleaning", "Staffing"],
+    description: "Event cleanup discovery source for post-party resets, venue turnover, and large-format logistics.",
+    pricing: { kind: "hourly", hourlyRate: 55, minHours: 4, setupFee: 100, label: "cleaning crew estimate" },
+    availability: [{ days: [...everyDay], start: "06:00", end: "23:30" }],
+    averageResponseMinutes: 360,
+    budgetTier: "standard",
+    maxGuestCount: 1200,
+    reviewCount: 90,
+    sourceLabel: "Yelp category",
+    sourceUrl: "https://www.yelp.com/search?find_desc=Event+Cleaning&find_loc=Los+Angeles%2C+CA",
+    tags: ["cleaning", "cleanup", "turnover", "staffing", "logistics"],
+  },
+  {
+    id: 36,
+    name: "Yelp - Los Angeles Taco Cart Catering",
+    type: "Catering",
+    location: "Los Angeles, CA",
+    address: "Los Angeles, CA",
+    coordinates: { lat: 34.0707, lng: -118.2076 },
+    price: "$22 / guest estimate",
+    rating: 4.6,
+    events: ["Birthday", "Graduation", "Private Party", "Fundraiser", "Corporate"],
+    services: ["Catering", "Staffing"],
+    description: "Taco cart catering discovery source for backyard parties, fundraisers, graduations, and casual corporate events.",
+    pricing: { kind: "perGuest", perGuest: 22, minimum: 950, serviceFee: 125, label: "taco cart estimate" },
+    availability: [{ days: [...everyDay], start: "10:00", end: "23:00" }],
+    averageResponseMinutes: 240,
+    budgetTier: "economy",
+    maxGuestCount: 400,
+    minGuestCount: 35,
+    reviewCount: 140,
+    sourceLabel: "Yelp category",
+    sourceUrl: "https://www.yelp.com/search?find_desc=Taco+Cart+Catering&find_loc=Los+Angeles%2C+CA",
+    tags: ["taco-cart", "catering", "birthday", "graduation", "casual"],
   },
 ];

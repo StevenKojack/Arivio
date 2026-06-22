@@ -272,12 +272,13 @@ export function MarketplaceBrowser() {
     startTime,
   ]);
   const canSaveCart = Boolean(profile && savedEvent);
+  const cartedIds = useMemo(() => cart.map((line) => line.item.id), [cart]);
+  const cartedItems = useMemo(() => cart.map((line) => line.item), [cart]);
   const marketplaceRows = useMemo(
-    () => buildMarketplaceRows(filteredItems),
-    [filteredItems],
+    () => buildMarketplaceRows(filteredItems, cartedItems),
+    [cartedItems, filteredItems],
   );
   const activeRow = marketplaceRows.find((row) => row.id === activeRowId) ?? marketplaceRows[0];
-  const cartedIds = useMemo(() => cart.map((line) => line.item.id), [cart]);
   const mapPins = useMemo<MarketplaceMapPin[]>(() => {
     const activeItems = activeRow?.items ?? [];
     const activeIds = new Set(activeItems.map((item) => item.id));
@@ -581,6 +582,12 @@ export function MarketplaceBrowser() {
     setCart((current) => current.filter((line) => line.item.id !== itemId));
   }
 
+  function replaceCompletedCategory(services: ServiceName[]) {
+    setCart((current) =>
+      current.filter((line) => !itemPrimaryMatchesServices(line.item, services)),
+    );
+  }
+
   function selectMapItem(item: MarketplaceItem) {
     setSelectedMapItemId(item.id);
     setIsMobileMapOpen(false);
@@ -748,12 +755,15 @@ export function MarketplaceBrowser() {
                     activeItemId={selectedMapItemId}
                     hoveredItemId={hoveredItemId}
                     rowId={row.id}
+                    isComplete={row.isComplete}
                     title={row.title}
                     description={row.description}
                     items={row.items}
+                    selectedItems={row.selectedItems}
                     quoteContext={globalQuoteContext}
                     onAdd={addToCart}
                     onHoverItem={setHoveredItemId}
+                    onReplace={() => replaceCompletedCategory(row.serviceNames)}
                     onSelectItem={(item) => setSelectedMapItemId(item.id)}
                   />
                 </div>
@@ -845,7 +855,10 @@ export function MarketplaceBrowser() {
 type MarketplaceRowGroup = {
   description: string;
   id: string;
+  isComplete: boolean;
   items: MarketplaceItem[];
+  selectedItems: MarketplaceItem[];
+  serviceNames: ServiceName[];
   title: string;
 };
 
@@ -1031,83 +1044,142 @@ function SummaryPill({ label, value }: { label: string; value: string }) {
   );
 }
 
-function buildMarketplaceRows(items: MarketplaceItem[]): MarketplaceRowGroup[] {
-  const rows: MarketplaceRowGroup[] = [
+function buildMarketplaceRows(
+  items: MarketplaceItem[],
+  cartedItems: MarketplaceItem[],
+): MarketplaceRowGroup[] {
+  const completedServices = Array.from(new Set(cartedItems.map((item) => item.type)));
+  const bestMatchItems = items
+    .filter(
+      (item) =>
+        cartedItems.some((cartedItem) => cartedItem.id === item.id) ||
+        !itemPrimaryMatchesServices(item, completedServices),
+    )
+    .slice(0, 10);
+  const rowDefinitions: Array<{
+    description: string;
+    id: string;
+    items: MarketplaceItem[];
+    serviceNames: ServiceName[];
+    title: string;
+  }> = [
     {
       description: "The strongest matches based on your event details.",
       id: "best-matches",
-      items: items.slice(0, 10),
+      items: bestMatchItems,
+      serviceNames: [] as ServiceName[],
       title: "Best matches",
     },
     {
       description: "Spaces and venues for the event itself.",
       id: "venues",
       items: byServices(items, ["Venue"]),
+      serviceNames: ["Venue"],
       title: "Venues",
     },
     {
       description: "Food, catering, cake, and dessert options.",
       id: "food-catering",
       items: byServices(items, ["Catering", "Cake & Desserts"]),
+      serviceNames: ["Catering", "Cake & Desserts"],
       title: "Food and catering",
     },
     {
       description: "DJs, live music, and sound-forward services.",
       id: "music-djs",
       items: byServices(items, ["DJ", "Live Music"]),
+      serviceNames: ["DJ", "Live Music"],
       title: "Music and DJs",
     },
     {
       description: "Tables, chairs, lounge, booths, and event equipment.",
       id: "rentals",
       items: byServices(items, ["Rentals", "Booth Rentals"]),
+      serviceNames: ["Rentals", "Booth Rentals"],
       title: "Rentals",
     },
     {
       description: "Photographers, booths, and visual coverage.",
       id: "photo-video",
       items: byServices(items, ["Photography", "Photo Booth"]),
+      serviceNames: ["Photography", "Photo Booth"],
       title: "Photo and video",
     },
     {
       description: "Performers and specialty entertainment when appropriate.",
       id: "entertainment",
-      items: byServices(items, ["Magic", "Character Performers"]),
+      items: byServices(items, ["Magic", "Character Performers", "Bounce Houses"]),
+      serviceNames: ["Magic", "Character Performers", "Bounce Houses"],
       title: "Entertainment",
     },
     {
       description: "Florals, invitations, programs, and presentation details.",
       id: "decor",
-      items: byServices(items, ["Florals", "Invitations", "Printed Programs", "Printed Materials"]),
+      items: byServices(items, ["Florals", "Balloons", "Invitations", "Printed Programs", "Printed Materials"]),
+      serviceNames: ["Florals", "Balloons", "Invitations", "Printed Programs", "Printed Materials"],
       title: "Decor",
     },
     {
       description: "Support teams for guest flow and event operations.",
       id: "security-staffing",
-      items: byServices(items, ["Staffing", "Security", "Registration"]),
+      items: byServices(items, ["Staffing", "Security", "Registration", "Bartending", "Valet"]),
+      serviceNames: ["Staffing", "Security", "Registration", "Bartending", "Valet"],
       title: "Security and staffing",
     },
     {
       description: "Restrooms, production, livestreaming, and practical event support.",
       id: "restrooms-logistics",
-      items: byServices(items, ["Portable Restrooms", "AV Production", "Live Streaming"]),
+      items: byServices(items, ["Portable Restrooms", "AV Production", "Live Streaming", "Cleaning"]),
+      serviceNames: ["Portable Restrooms", "AV Production", "Live Streaming", "Cleaning"],
       title: "Restrooms and logistics",
     },
     {
       description: "Passenger movement, shuttles, and point-to-point event transport.",
       id: "transportation",
-      items: byServices(items, ["Transportation"]),
+      items: byServices(items, ["Transportation", "Party Bus", "Valet"]),
+      serviceNames: ["Transportation", "Party Bus", "Valet"],
       title: "Transportation",
     },
   ];
 
-  return rows.filter((row) => row.items.length > 0);
+  const rows = rowDefinitions
+    .map((row) => {
+      const selectedItems =
+        row.serviceNames.length === 0
+          ? []
+          : cartedItems.filter((item) =>
+              itemPrimaryMatchesServices(item, row.serviceNames),
+            );
+      const isComplete = row.id !== "best-matches" && selectedItems.length > 0;
+
+      return {
+        ...row,
+        isComplete,
+        items: isComplete ? selectedItems : row.items,
+        selectedItems,
+      };
+    })
+    .filter((row) => row.items.length > 0);
+
+  return [
+    ...rows.filter((row) => !row.isComplete),
+    ...rows.filter((row) => row.isComplete),
+  ];
 }
 
 function byServices(items: MarketplaceItem[], services: ServiceName[]) {
   return items.filter(
-    (item) =>
-      services.includes(item.type) ||
-      item.services.some((service) => services.includes(service)),
+    (item) => itemMatchesServices(item, services),
   );
+}
+
+function itemMatchesServices(item: MarketplaceItem, services: ServiceName[]) {
+  return (
+    services.includes(item.type) ||
+    item.services.some((service) => services.includes(service))
+  );
+}
+
+function itemPrimaryMatchesServices(item: MarketplaceItem, services: ServiceName[]) {
+  return services.includes(item.type);
 }

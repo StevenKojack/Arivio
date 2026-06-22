@@ -36,6 +36,30 @@ textarea {
   transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+.arivio-map-popup .mapboxgl-popup-content {
+  overflow: hidden;
+  padding: 0;
+  border-radius: 22px;
+  box-shadow: 0 28px 80px rgba(20, 20, 20, 0.22);
+}
+
+.arivio-map-popup .mapboxgl-popup-close-button {
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #111;
+  font-size: 20px;
+  line-height: 28px;
+  box-shadow: 0 8px 24px rgba(20, 20, 20, 0.16);
+}
+
+.arivio-map-popup .mapboxgl-popup-tip {
+  display: none;
+}
+
 input:focus,
 select:focus,
 textarea:focus {
