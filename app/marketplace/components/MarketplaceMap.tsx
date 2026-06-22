@@ -15,6 +15,7 @@ type MarketplaceMapProps = {
   cartedIds: number[];
   eventCoordinates?: Coordinates;
   hoveredItemId: number | null;
+  layout?: "panel" | "sheet" | "sticky";
   pins: MarketplaceMapPin[];
   selectedItemId: number | null;
   onHoverItem: (itemId: number | null) => void;
@@ -39,6 +40,7 @@ export function MarketplaceMap({
   cartedIds,
   eventCoordinates,
   hoveredItemId,
+  layout = "sticky",
   pins,
   selectedItemId,
   onHoverItem,
@@ -56,9 +58,15 @@ export function MarketplaceMap({
     width: 1280,
     zoom: eventCoordinates ? 10 : 9,
   });
+  const isSheet = layout === "sheet";
+  const isSticky = layout === "sticky";
 
   return (
-    <section className="sticky top-24 overflow-hidden rounded-[34px] border border-neutral-200 bg-[#e9eee8] shadow-[0_28px_90px_rgba(20,20,20,0.14)]">
+    <section
+      className={`overflow-hidden rounded-[34px] border border-neutral-200 bg-[#e9eee8] shadow-[0_28px_90px_rgba(20,20,20,0.14)] ${
+        isSticky ? "sticky top-24" : "relative"
+      }`}
+    >
       <div className="flex items-center justify-between gap-3 border-b border-white/70 bg-white/85 px-5 py-4 backdrop-blur">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
@@ -72,7 +80,13 @@ export function MarketplaceMap({
           {pins.length} pins
         </span>
       </div>
-      <div className="relative min-h-[520px] overflow-hidden">
+      <div
+        className={`relative overflow-hidden ${
+          isSheet
+            ? "h-[68vh] min-h-[420px]"
+            : "h-[calc(100vh-15rem)] min-h-[500px]"
+        }`}
+      >
         {staticMapUrl ? (
           <div
             aria-label="Mapbox map preview"
@@ -107,7 +121,7 @@ export function MarketplaceMap({
               onMouseLeave={() => onHoverItem(null)}
               className={`absolute z-20 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white text-xs font-semibold text-white shadow-[0_18px_44px_rgba(20,20,20,0.25)] transition duration-200 hover:-translate-y-[58%] ${
                 isSelected || isHovered
-                  ? "px-4 py-2 scale-110"
+                  ? "scale-110 px-4 py-2"
                   : isCarted
                     ? "px-3.5 py-2 ring-4 ring-[#ff5a5f]/25"
                     : pin.isActiveRowMatch

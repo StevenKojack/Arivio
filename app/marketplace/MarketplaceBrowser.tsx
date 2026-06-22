@@ -113,6 +113,7 @@ export function MarketplaceBrowser() {
   const [cartMessage, setCartMessage] = useState("");
   const [activeRowId, setActiveRowId] = useState("best-matches");
   const [hoveredItemId, setHoveredItemId] = useState<number | null>(null);
+  const [isMobileMapOpen, setIsMobileMapOpen] = useState(false);
   const [selectedMapItemId, setSelectedMapItemId] = useState<number | null>(null);
   const [isRequestingQuotes, setIsRequestingQuotes] = useState(false);
   const durationHours = getHoursBetween(startTime, endTime);
@@ -267,7 +268,7 @@ export function MarketplaceBrowser() {
     [filteredItems],
   );
   const activeRow = marketplaceRows.find((row) => row.id === activeRowId) ?? marketplaceRows[0];
-  const cartedIds = cart.map((line) => line.item.id);
+  const cartedIds = useMemo(() => cart.map((line) => line.item.id), [cart]);
   const mapPins = useMemo<MarketplaceMapPin[]>(() => {
     const activeItems = activeRow?.items ?? [];
     const activeIds = new Set(activeItems.map((item) => item.id));
@@ -516,6 +517,7 @@ export function MarketplaceBrowser() {
 
   function selectMapItem(item: MarketplaceItem) {
     setSelectedMapItemId(item.id);
+    setIsMobileMapOpen(false);
     const card = document.getElementById(`vendor-card-${item.id}`);
 
     card?.scrollIntoView({
@@ -523,6 +525,22 @@ export function MarketplaceBrowser() {
       block: "nearest",
       inline: "center",
     });
+  }
+
+  function renderQuoteCart() {
+    return (
+      <QuoteCartDrawer
+        canSaveCart={canSaveCart}
+        cart={cart}
+        cartMessage={cartMessage}
+        eventSummary={`${eventDate || "Choose a date"} from ${startTime} to ${endTime}`}
+        getLineQuote={getLineQuote}
+        isRequestingQuotes={isRequestingQuotes}
+        onRemove={removeFromCart}
+        onRequestQuotes={requestQuotes}
+        onUpdateTime={updateCartTime}
+      />
+    );
   }
 
   async function updateCartTime(
@@ -620,8 +638,8 @@ export function MarketplaceBrowser() {
 
   return (
     <>
-      <div className="grid min-w-0 gap-6 2xl:grid-cols-[minmax(380px,0.9fr)_minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="min-w-0 space-y-5 2xl:order-none xl:col-span-1">
+      <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(430px,42vw)] 2xl:grid-cols-[minmax(0,1fr)_minmax(520px,38vw)]">
+        <div className="min-w-0 space-y-6">
           <EventContextPanel
             eventDate={eventDate}
             eventLocationLabel={eventLocationLabel}
@@ -642,19 +660,18 @@ export function MarketplaceBrowser() {
             onUseCurrentLocation={useCurrentLocation}
           />
 
-          <MarketplaceMap
-            activeCategory={activeRow?.title ?? "Best matches"}
-            cartedIds={cartedIds}
-            eventCoordinates={eventCoordinates}
-            hoveredItemId={hoveredItemId}
-            pins={mapPins}
-            selectedItemId={selectedMapItemId}
-            onHoverItem={setHoveredItemId}
-            onSelectItem={selectMapItem}
-          />
-        </div>
+          <div className="xl:hidden">
+            <button
+              type="button"
+              onClick={() => setIsMobileMapOpen(true)}
+              className="fixed bottom-5 right-5 z-40 rounded-full bg-neutral-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_48px_rgba(20,20,20,0.28)] transition duration-200 hover:-translate-y-0.5 hover:bg-neutral-800"
+            >
+              Map
+            </button>
+            {renderQuoteCart()}
+          </div>
 
-        <div className="min-w-0 space-y-6 xl:col-span-1">
+          <div className="hidden xl:block">{renderQuoteCart()}</div>
 
           {marketplaceRows.length ? (
             <div className="space-y-6 animate-[fadeUp_280ms_ease-out]">
@@ -687,20 +704,58 @@ export function MarketplaceBrowser() {
           )}
         </div>
 
-        <div className="min-w-0 xl:col-span-1">
-          <QuoteCartDrawer
-            canSaveCart={canSaveCart}
-            cart={cart}
-            cartMessage={cartMessage}
-            eventSummary={`${eventDate || "Choose a date"} from ${startTime} to ${endTime}`}
-            getLineQuote={getLineQuote}
-            isRequestingQuotes={isRequestingQuotes}
-            onRemove={removeFromCart}
-            onRequestQuotes={requestQuotes}
-            onUpdateTime={updateCartTime}
-          />
-        </div>
+        <aside className="hidden min-w-0 xl:block" aria-label="Persistent marketplace map">
+          <div className="fixed bottom-8 right-6 top-24 z-20 w-[min(42vw,620px)] 2xl:right-8 2xl:w-[min(38vw,680px)]">
+            <MarketplaceMap
+              activeCategory={activeRow?.title ?? "Best matches"}
+              cartedIds={cartedIds}
+              eventCoordinates={eventCoordinates}
+              hoveredItemId={hoveredItemId}
+              layout="panel"
+              pins={mapPins}
+              selectedItemId={selectedMapItemId}
+              onHoverItem={setHoveredItemId}
+              onSelectItem={selectMapItem}
+            />
+          </div>
+        </aside>
       </div>
+
+      {isMobileMapOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end bg-neutral-950/35 px-3 py-4 backdrop-blur-sm xl:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Marketplace map"
+          onClick={() => setIsMobileMapOpen(false)}
+        >
+          <div
+            className="mx-auto w-full max-w-2xl animate-[fadeUp_220ms_ease-out]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-3 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsMobileMapOpen(false)}
+                className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-neutral-950 shadow-[0_16px_40px_rgba(20,20,20,0.18)] transition hover:-translate-y-0.5"
+              >
+                Close
+              </button>
+            </div>
+            <MarketplaceMap
+              activeCategory={activeRow?.title ?? "Best matches"}
+              cartedIds={cartedIds}
+              eventCoordinates={eventCoordinates}
+              hoveredItemId={hoveredItemId}
+              layout="sheet"
+              pins={mapPins}
+              selectedItemId={selectedMapItemId}
+              onHoverItem={setHoveredItemId}
+              onSelectItem={selectMapItem}
+            />
+          </div>
+        </div>
+      ) : null}
 
       <FilterDrawer
         eventTypes={eventTypes}
