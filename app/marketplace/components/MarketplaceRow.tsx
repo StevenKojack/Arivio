@@ -49,13 +49,13 @@ export function MarketplaceRow({
           {items.length}
         </span>
       </div>
-      <div className="mt-5 flex min-w-0 snap-x gap-5 overflow-x-auto overscroll-x-contain scroll-smooth pb-4 [scrollbar-width:thin]">
+      <div className="mt-4 flex min-w-0 snap-x gap-4 overflow-x-auto overscroll-x-contain scroll-smooth pb-3 [scrollbar-width:thin]">
         {items.map((item, index) => (
           <div
             key={`${title}-${item.id}`}
             id={`vendor-card-${item.id}`}
             data-row-id={rowId}
-            className="w-[min(76vw,340px)] shrink-0 snap-start 2xl:w-[360px]"
+            className="w-[min(74vw,310px)] shrink-0 snap-start 2xl:w-[326px]"
           >
             <VendorCard
               buttonLabel={cartedIds.includes(item.id) ? "Selected" : "Add to quote"}

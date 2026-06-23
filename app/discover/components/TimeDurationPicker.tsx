@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { getEndTime, getHoursBetween } from "@/app/data/marketplace";
 import { FloatingPopover } from "@/app/components/ui/FloatingPopover";
+import { formatTime, getTimeOptions } from "@/lib/utils/format";
 
 type TimeDurationPickerProps = {
   endTime: string;
@@ -18,6 +19,7 @@ const durationPresets = [
   { hours: 6, label: "6 hours" },
   { hours: 8, label: "All day" },
 ];
+const timeOptions = getTimeOptions();
 
 export function TimeDurationPicker({
   endTime,
@@ -48,7 +50,7 @@ export function TimeDurationPicker({
         className="mt-2 flex h-14 w-full items-center justify-between rounded-2xl border border-neutral-300 bg-white px-4 text-left text-sm font-semibold text-neutral-950 shadow-[0_10px_30px_rgba(20,20,20,0.04)] transition duration-200 ease-out hover:-translate-y-0.5 hover:border-neutral-500 hover:shadow-[0_16px_40px_rgba(20,20,20,0.08)] focus:border-neutral-950 focus:outline-none focus:ring-4 focus:ring-neutral-950/10"
       >
         <span>
-          {startTime} - {endTime}
+          {formatTime(startTime)} - {formatTime(endTime)}
         </span>
         <span className="rounded-full bg-[#f7f7f5] px-3 py-1 text-xs text-neutral-600">
           {durationHours} hr
@@ -84,24 +86,34 @@ export function TimeDurationPicker({
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             <label className="text-sm font-semibold text-neutral-800">
               Start time
-              <input
-                type="time"
+              <select
                 value={startTime}
                 onChange={(event) => {
                   onStartTimeChange(event.target.value);
                   onEndTimeChange(getEndTime(event.target.value, durationHours));
                 }}
-                className="mt-2 h-12 w-full rounded-2xl border border-neutral-300 px-4 text-sm font-semibold outline-none transition duration-200 ease-out focus:border-neutral-950 focus:ring-4 focus:ring-neutral-950/10"
-              />
+                className="mt-2 h-12 w-full rounded-2xl border border-neutral-300 bg-white px-4 text-sm font-semibold outline-none transition duration-200 ease-out focus:border-neutral-950 focus:ring-4 focus:ring-neutral-950/10"
+              >
+                {timeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="text-sm font-semibold text-neutral-800">
               End time
-              <input
-                type="time"
+              <select
                 value={endTime}
                 onChange={(event) => onEndTimeChange(event.target.value)}
-                className="mt-2 h-12 w-full rounded-2xl border border-neutral-300 px-4 text-sm font-semibold outline-none transition duration-200 ease-out focus:border-neutral-950 focus:ring-4 focus:ring-neutral-950/10"
-              />
+                className="mt-2 h-12 w-full rounded-2xl border border-neutral-300 bg-white px-4 text-sm font-semibold outline-none transition duration-200 ease-out focus:border-neutral-950 focus:ring-4 focus:ring-neutral-950/10"
+              >
+                {timeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
 

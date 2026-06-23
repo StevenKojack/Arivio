@@ -160,15 +160,11 @@ export function MarketplaceMap({
     map.on("click", closePopup);
 
     pins.forEach((pin) => {
-      const isHovered = hoveredItemId === pin.item.id;
-      const isSelected = selectedItemId === pin.item.id;
       const isCarted = cartedIds.includes(pin.item.id) || pin.isCarted;
       const markerElement = createProviderMarker({
         color: categoryColors[pin.item.type] ?? "#111111",
         isActive: pin.isActiveRowMatch,
         isCarted,
-        isHovered,
-        isSelected,
         item: pin.item,
       });
 
@@ -196,16 +192,30 @@ export function MarketplaceMap({
       map.off("click", closePopup);
     };
   }, [
-    onAddItem,
     cartedIds,
     eventCoordinates,
     hasInteractiveMap,
-    hoveredItemId,
     onHoverItem,
     onSelectItem,
     pins,
-    selectedItemId,
   ]);
+
+  useEffect(() => {
+    if (!hasInteractiveMap) {
+      return;
+    }
+
+    markerRefs.current.forEach((marker) => {
+      const element = marker.getElement();
+      const itemId = Number(element.dataset.arivioItemId);
+      const isFocused = itemId === hoveredItemId || itemId === selectedItemId;
+
+      element.classList.toggle("scale-110", isFocused);
+      element.classList.toggle("ring-4", isFocused);
+      element.classList.toggle("ring-neutral-950/10", isFocused);
+      element.classList.toggle("shadow-[0_24px_56px_rgba(20,20,20,0.28)]", isFocused);
+    });
+  }, [hasInteractiveMap, hoveredItemId, selectedItemId]);
 
   useEffect(() => {
     if (!mapRef.current || !hasInteractiveMap || !selectedItemId) {
@@ -412,19 +422,16 @@ function createProviderMarker({
   color,
   isActive,
   isCarted,
-  isHovered,
-  isSelected,
   item,
 }: {
   color: string;
   isActive: boolean;
   isCarted: boolean;
-  isHovered: boolean;
-  isSelected: boolean;
   item: MarketplaceItem;
 }) {
   const marker = document.createElement("button");
   marker.type = "button";
+  marker.dataset.arivioItemId = String(item.id);
   marker.innerHTML = `
     <span class="relative z-10">${getServiceIcon(item.type, 18)}</span>
     <span class="absolute -bottom-1.5 left-1/2 h-3.5 w-3.5 -translate-x-1/2 rotate-45 rounded-[3px] border-b-2 border-r-2 border-white" style="background:${isCarted ? "#256f4a" : color};"></span>
@@ -449,7 +456,6 @@ function createProviderMarker({
     "hover:shadow-[0_24px_56px_rgba(20,20,20,0.28)]",
     isCarted ? "ring-4 ring-emerald-600/25" : "",
     isActive ? "" : "opacity-80",
-    isHovered || isSelected ? "scale-110 ring-4 ring-neutral-950/10" : "",
   ]
     .filter(Boolean)
     .join(" ");

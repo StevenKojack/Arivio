@@ -6,12 +6,14 @@ type FilterDrawerProps = {
   eventTypes: EventType[];
   isOpen: boolean;
   query: string;
+  excludedServices: ServiceName[];
   selectedEvent: EventType | "All";
   selectedServices: ServiceName[];
   serviceOptions: ServiceName[];
   onClose: () => void;
   onEventChange: (eventType: EventType | "All") => void;
   onQueryChange: (value: string) => void;
+  onToggleExcludedService: (service: ServiceName) => void;
   onToggleService: (service: ServiceName) => void;
 };
 
@@ -21,8 +23,10 @@ export function FilterDrawer({
   onClose,
   onEventChange,
   onQueryChange,
+  onToggleExcludedService,
   onToggleService,
   query,
+  excludedServices,
   selectedEvent,
   selectedServices,
   serviceOptions,
@@ -59,19 +63,28 @@ export function FilterDrawer({
             placeholder="Search vendors, cities, or needs"
             className="h-12 rounded-2xl border border-neutral-300 px-4 text-sm font-semibold outline-none transition focus:border-neutral-950"
           />
-          <select
-            value={selectedEvent}
-            onChange={(event) => onEventChange(event.target.value as EventType | "All")}
-            className="h-12 rounded-2xl border border-neutral-300 bg-white px-4 text-sm font-semibold outline-none transition focus:border-neutral-950"
-          >
-            <option>All</option>
-            {eventTypes.map((eventType) => (
-              <option key={eventType}>{eventType}</option>
-            ))}
-          </select>
           <div>
-            <p className="text-sm font-semibold text-neutral-800">Services</p>
-            <div className="mt-3 flex max-h-52 flex-wrap gap-2 overflow-y-auto">
+            <p className="text-sm font-semibold text-neutral-800">Event type</p>
+            <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+              {(["All", ...eventTypes] as Array<EventType | "All">).map((eventType) => (
+                <button
+                  key={eventType}
+                  type="button"
+                  onClick={() => onEventChange(eventType)}
+                  className={`shrink-0 rounded-full px-3 py-2 text-xs font-semibold transition ${
+                    selectedEvent === eventType
+                      ? "bg-neutral-950 text-white"
+                      : "border border-neutral-200 bg-white text-neutral-700 hover:-translate-y-0.5 hover:border-neutral-950"
+                  }`}
+                >
+                  {eventType}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-neutral-800">Include services</p>
+            <div className="mt-3 flex max-h-44 flex-wrap gap-2 overflow-y-auto pr-1">
               {serviceOptions.map((service) => (
                 <button
                   key={service}
@@ -80,7 +93,29 @@ export function FilterDrawer({
                   className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
                     selectedServices.includes(service)
                       ? "bg-neutral-950 text-white"
-                      : "border border-neutral-200 bg-white text-neutral-700 hover:border-neutral-950"
+                      : "border border-neutral-200 bg-white text-neutral-700 hover:-translate-y-0.5 hover:border-neutral-950"
+                  }`}
+                >
+                  {service}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-3xl bg-[#f7f7f5] p-4">
+            <p className="text-sm font-semibold text-neutral-800">Hide services</p>
+            <p className="mt-1 text-xs leading-5 text-neutral-500">
+              Use this only when a category is clearly not needed.
+            </p>
+            <div className="mt-3 flex max-h-36 flex-wrap gap-2 overflow-y-auto pr-1">
+              {serviceOptions.map((service) => (
+                <button
+                  key={service}
+                  type="button"
+                  onClick={() => onToggleExcludedService(service)}
+                  className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
+                    excludedServices.includes(service)
+                      ? "bg-white text-neutral-950 ring-2 ring-neutral-950"
+                      : "border border-neutral-200 bg-white/70 text-neutral-600 hover:-translate-y-0.5 hover:border-neutral-950"
                   }`}
                 >
                   {service}

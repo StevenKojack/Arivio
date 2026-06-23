@@ -17,6 +17,7 @@ import { CalendarPicker } from "./components/CalendarPicker";
 import { ServiceRecommendationCard } from "./components/ServiceRecommendationCard";
 import { StepCard } from "./components/StepCard";
 import { TimeDurationPicker } from "./components/TimeDurationPicker";
+import { formatTime } from "@/lib/utils/format";
 
 type LocationKind =
   | "Venue needed"
@@ -1099,7 +1100,7 @@ function FinalReview({
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <PlainDetail label="Date" value={timing.date || "Choose date"} />
-        <PlainDetail label="Time" value={`${timing.startTime} - ${timing.endTime}`} />
+        <PlainDetail label="Time" value={`${formatTime(timing.startTime)} - ${formatTime(timing.endTime)}`} />
         <PlainDetail label="Guests" value={guestCount.toLocaleString()} />
         <PlainDetail label="Budget" value={`$${budget.toLocaleString()}`} />
       </div>

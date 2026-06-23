@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   estimateDriveMinutes,
@@ -11,6 +11,7 @@ import {
   getHoursBetween,
   homeAreas,
   isAvailableAt,
+  allServices,
   marketplaceItems,
   marketplaceTypes,
   quoteItem,
@@ -39,6 +40,7 @@ import {
   searchAddressSuggestions,
   type AddressSuggestion,
 } from "@/lib/maps/geocoding";
+import { formatTime } from "@/lib/utils/format";
 import { FilterDrawer } from "./components/FilterDrawer";
 import { MarketplaceMap, type MarketplaceMapPin } from "./components/MarketplaceMap";
 import { MarketplaceRow } from "./components/MarketplaceRow";
@@ -98,6 +100,7 @@ export function MarketplaceBrowser() {
   const [selectedServices, setSelectedServices] = useState<ServiceName[]>(
     initialServices ?? initialRecommendedServices,
   );
+  const [excludedServices, setExcludedServices] = useState<ServiceName[]>([]);
   const [query, setQuery] = useState("");
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
   const [eventDate, setEventDate] = useState(searchParams.get("date") ?? "");
@@ -173,15 +176,16 @@ export function MarketplaceBrowser() {
         : [],
     [eventCoordinates, providers],
   );
-  const visibleMarketplaceTypes = (
-    selectedEvent === "All"
-      ? marketplaceTypes
-      : [
-          "All",
-          ...eventPlanPresets[selectedEvent].recommended,
-          ...selectedServices,
-        ].filter((service, index, services) => services.indexOf(service) === index)
-  ).filter((service): service is ServiceName => service !== "All");
+  const visibleMarketplaceTypes = useMemo(
+    () =>
+      [
+        ...(selectedEvent === "All" ? allServices : eventPlanPresets[selectedEvent].recommended),
+        ...selectedServices,
+        ...excludedServices,
+        ...curatedFilterServices,
+      ].filter((service, index, services) => services.indexOf(service) === index),
+    [excludedServices, selectedEvent, selectedServices],
+  );
   const planSummary = [
     isEventType(initialEvent) ? initialEvent : null,
     guestCount ? `${guestCount.toLocaleString()} guests` : null,
@@ -202,7 +206,10 @@ export function MarketplaceBrowser() {
         selectedEvent === "All" || item.events.includes(selectedEvent);
       const matchesServices =
         selectedServices.length === 0 ||
-        item.services.some((service) => selectedServices.includes(service));
+        itemMatchesServices(item, selectedServices);
+      const isExcluded = excludedServices.some((service) =>
+        itemMatchesServices(item, [service]),
+      );
       const searchText = `${item.name} ${item.location} ${item.address} ${item.events.join(
         " ",
       )} ${item.services.join(" ")} ${(item.tags ?? []).join(" ")}`;
@@ -236,6 +243,7 @@ export function MarketplaceBrowser() {
       return (
         matchesEvent &&
         matchesServices &&
+        !isExcluded &&
         matchesQuery &&
         matchesCity &&
         withinRadius &&
@@ -268,6 +276,7 @@ export function MarketplaceBrowser() {
     providers,
     savedEvent?.city,
     selectedEvent,
+    excludedServices,
     selectedServices,
     startTime,
   ]);
@@ -376,7 +385,7 @@ export function MarketplaceBrowser() {
         const rowId = visibleEntry?.target.getAttribute("data-marketplace-row");
 
         if (rowId) {
-          setActiveRowId(rowId);
+          setActiveRowId((current) => (current === rowId ? current : rowId));
         }
       },
       {
@@ -428,7 +437,17 @@ export function MarketplaceBrowser() {
   }
 
   function toggleService(service: ServiceName) {
+    setExcludedServices((current) => current.filter((item) => item !== service));
     setSelectedServices((current) =>
+      current.includes(service)
+        ? current.filter((item) => item !== service)
+        : [...current, service],
+    );
+  }
+
+  function toggleExcludedService(service: ServiceName) {
+    setSelectedServices((current) => current.filter((item) => item !== service));
+    setExcludedServices((current) =>
       current.includes(service)
         ? current.filter((item) => item !== service)
         : [...current, service],
@@ -438,6 +457,7 @@ export function MarketplaceBrowser() {
   function chooseEventType(nextEvent: EventType | "All") {
     setSelectedEvent(nextEvent);
     setQuery("");
+    setExcludedServices([]);
     setSelectedServices(
       nextEvent === "All" ? [] : eventPlanPresets[nextEvent].recommended,
     );
@@ -514,7 +534,7 @@ export function MarketplaceBrowser() {
     );
   }
 
-  async function addToCart(item: MarketplaceItem) {
+  const addToCart = useCallback(async (item: MarketplaceItem) => {
     if (cart.some((line) => line.item.id === item.id)) {
       return;
     }
@@ -575,13 +595,22 @@ export function MarketplaceBrowser() {
           : "Unable to save this cart item yet.",
       );
     }
-  }
+  }, [
+    cart,
+    durationHours,
+    endTime,
+    eventDate,
+    guestCount,
+    profile,
+    savedEvent,
+    startTime,
+  ]);
 
-  function removeFromCart(itemId: number) {
+  const removeFromCart = useCallback((itemId: number) => {
     setCart((current) => current.filter((line) => line.item.id !== itemId));
-  }
+  }, []);
 
-  function selectMapItem(item: MarketplaceItem) {
+  const selectMapItem = useCallback((item: MarketplaceItem) => {
     setSelectedMapItemId(item.id);
     setIsMobileMapOpen(false);
     const card = document.getElementById(`vendor-card-${item.id}`);
@@ -591,15 +620,15 @@ export function MarketplaceBrowser() {
       block: "nearest",
       inline: "center",
     });
-  }
+  }, []);
 
-  function renderQuoteCart(variant: "panel" | "compact" = "panel") {
+  function renderQuoteCart(variant: "panel" | "compact" | "bar" = "panel") {
     return (
       <QuoteCartDrawer
         canSaveCart={canSaveCart}
         cart={cart}
         cartMessage={cartMessage}
-        eventSummary={`${eventDate || "Choose a date"} from ${startTime} to ${endTime}`}
+        eventSummary={`${eventDate || "Choose a date"} from ${formatTime(startTime)} to ${formatTime(endTime)}`}
         getLineQuote={getLineQuote}
         isRequestingQuotes={isRequestingQuotes}
         variant={variant}
@@ -705,7 +734,7 @@ export function MarketplaceBrowser() {
 
   return (
     <>
-      <div className="relative min-h-[calc(100vh-5rem)] w-full overflow-hidden rounded-[32px] border border-white/70 bg-white/45 p-3 shadow-[0_24px_80px_rgba(20,20,20,0.08)] backdrop-blur sm:p-4">
+      <div className="relative min-h-[calc(100vh-5rem)] w-full overflow-x-clip rounded-[32px] border border-white/70 bg-white/45 p-3 shadow-[0_24px_80px_rgba(20,20,20,0.08)] backdrop-blur sm:p-4">
         <EventContextPanel
           eventDate={eventDate}
           eventLocationLabel={eventLocationLabel}
@@ -729,8 +758,8 @@ export function MarketplaceBrowser() {
           onUseCurrentLocation={useCurrentLocation}
         />
 
-        <div className="mt-4 grid min-w-0 gap-4 xl:grid-cols-[minmax(0,58%)_minmax(440px,42%)] xl:items-start">
-          <div className="min-w-0 space-y-5 pb-28 xl:pb-4">
+        <div className="mt-4 grid min-w-0 gap-4 xl:grid-cols-[minmax(0,56%)_minmax(440px,44%)]">
+          <div className="min-w-0 space-y-4 pb-28 xl:pb-4">
           <div className="xl:hidden">
             <button
               type="button"
@@ -740,8 +769,12 @@ export function MarketplaceBrowser() {
               Map
             </button>
             <div className="fixed bottom-5 left-4 right-24 z-40">
-              {renderQuoteCart("compact")}
+              {renderQuoteCart("bar")}
             </div>
+          </div>
+
+          <div className="sticky top-3 z-30 hidden xl:block">
+            {renderQuoteCart("bar")}
           </div>
 
           {marketplaceRows.length ? (
@@ -776,7 +809,7 @@ export function MarketplaceBrowser() {
           )}
         </div>
 
-        <aside className="relative hidden min-w-0 xl:block" aria-label="Persistent marketplace map">
+        <aside className="relative hidden min-w-0 self-stretch xl:block" aria-label="Persistent marketplace map">
           <div className="sticky top-3">
             <MarketplaceMap
               activeCategory={activeRow?.title ?? "Best matches"}
@@ -790,9 +823,6 @@ export function MarketplaceBrowser() {
               onHoverItem={setHoveredItemId}
               onSelectItem={selectMapItem}
             />
-            <div className="absolute right-4 top-4 z-30 w-[min(360px,36vw)]">
-              {renderQuoteCart("compact")}
-            </div>
           </div>
         </aside>
         </div>
@@ -840,11 +870,13 @@ export function MarketplaceBrowser() {
         isOpen={isFilterDrawerOpen}
         query={query}
         selectedEvent={selectedEvent}
+        excludedServices={excludedServices}
         selectedServices={selectedServices}
         serviceOptions={visibleMarketplaceTypes}
         onClose={() => setIsFilterDrawerOpen(false)}
         onEventChange={chooseEventType}
         onQueryChange={setQuery}
+        onToggleExcludedService={toggleExcludedService}
         onToggleService={toggleService}
       />
     </>
@@ -858,6 +890,22 @@ type MarketplaceRowGroup = {
   serviceNames: ServiceName[];
   title: string;
 };
+
+const curatedFilterServices: ServiceName[] = [
+  "Venue",
+  "Catering",
+  "DJ",
+  "Photography",
+  "Florals",
+  "Rentals",
+  "Security",
+  "Transportation",
+  "Magic",
+  "Character Performers",
+  "Bounce Houses",
+  "Bartending",
+  "Cleaning",
+];
 
 function EventContextPanel({
   endTime,
@@ -919,7 +967,7 @@ function EventContextPanel({
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <div className="flex min-w-0 max-w-full gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
             <SummaryPill label="Date" value={eventDate || "Choose date"} />
-            <SummaryPill label="Time" value={`${startTime} - ${endTime}`} />
+            <SummaryPill label="Time" value={`${formatTime(startTime)} - ${formatTime(endTime)}`} />
             <SummaryPill label="Guests" value={guestCount.toLocaleString()} />
             <SummaryPill label="Location" value={eventLocationLabel} />
             <SummaryPill label="Services" value={serviceSummary} />

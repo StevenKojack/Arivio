@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { isAvailableAt, type MarketplaceItem } from "@/app/data/marketplace";
+import { getTimeOptions } from "@/lib/utils/format";
 
 export type QuoteCartLine = {
   cartItemId?: string;
@@ -19,7 +20,7 @@ type QuoteCartDrawerProps = {
   eventSummary: string;
   getLineQuote: (line: QuoteCartLine) => number;
   isRequestingQuotes: boolean;
-  variant?: "panel" | "compact";
+  variant?: "panel" | "compact" | "bar";
   onRemove: (itemId: number) => void;
   onRequestQuotes: () => void;
   onUpdateTime: (
@@ -28,6 +29,8 @@ type QuoteCartDrawerProps = {
     value: string,
   ) => void;
 };
+
+const timeOptions = getTimeOptions();
 
 export function QuoteCartDrawer({
   canSaveCart,
@@ -43,6 +46,50 @@ export function QuoteCartDrawer({
 }: QuoteCartDrawerProps) {
   const total = cart.reduce((sum, line) => sum + getLineQuote(line), 0);
   const isCompact = variant === "compact";
+  const isBar = variant === "bar";
+
+  if (isBar) {
+    return (
+      <aside className="min-w-0 rounded-[24px] border border-neutral-200 bg-white/95 p-3 shadow-[0_18px_56px_rgba(20,20,20,0.08)] backdrop-blur transition duration-200 ease-out">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
+              Quote cart
+            </p>
+            <div className="mt-1 flex flex-wrap items-end gap-x-3 gap-y-1">
+              <h2 className="text-xl font-semibold tracking-tight">
+                {cart.length} selected
+              </h2>
+              <p className="text-sm font-semibold text-neutral-600">
+                ${total.toLocaleString()} est.
+              </p>
+            </div>
+            <p className="mt-1 truncate text-xs font-semibold text-neutral-500">
+              {cartMessage || eventSummary}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            {!canSaveCart ? (
+              <Link
+                href="/auth/login"
+                className="hidden rounded-full border border-neutral-200 px-3 py-2 text-xs font-semibold text-neutral-700 transition hover:-translate-y-0.5 hover:border-neutral-950 sm:inline-flex"
+              >
+                Log in to save
+              </Link>
+            ) : null}
+            <button
+              type="button"
+              onClick={onRequestQuotes}
+              disabled={isRequestingQuotes}
+              className="h-10 rounded-full bg-neutral-950 px-4 text-sm font-semibold text-white transition duration-200 ease-out hover:-translate-y-0.5 hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+            >
+              {isRequestingQuotes ? "Requesting..." : "Request quotes"}
+            </button>
+          </div>
+        </div>
+      </aside>
+    );
+  }
 
   return (
     <aside
@@ -210,12 +257,17 @@ function CartTimeField({
   return (
     <label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-500">
       {label}
-      <input
-        type="time"
+      <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="mt-1 h-9 w-full rounded-xl border border-neutral-200 bg-white px-2 text-sm text-neutral-950"
-      />
+      >
+        {timeOptions.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
     </label>
   );
 }
