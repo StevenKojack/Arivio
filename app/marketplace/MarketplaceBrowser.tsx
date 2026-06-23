@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   estimateDriveMinutes,
@@ -18,6 +18,7 @@ import {
   type Coordinates,
   type EventType,
   type MarketplaceItem,
+  type MarketplaceServiceOption,
   type QuoteContext,
   type ServiceName,
 } from "../data/marketplace";
@@ -43,7 +44,7 @@ import {
 import { formatTime } from "@/lib/utils/format";
 import { FilterDrawer } from "./components/FilterDrawer";
 import { MarketplaceMap, type MarketplaceMapPin } from "./components/MarketplaceMap";
-import { MarketplaceRow } from "./components/MarketplaceRow";
+import { MemoizedMarketplaceRow as MarketplaceRow } from "./components/MarketplaceRow";
 import { QuoteCartDrawer } from "./components/QuoteCartDrawer";
 
 type MarketplaceFilter = (typeof marketplaceTypes)[number];
@@ -54,8 +55,11 @@ type CartLine = {
   id: number;
   item: MarketplaceItem;
   persisted: boolean;
+  priceAdjustment: number;
   serviceEnd: string;
+  serviceName: ServiceName;
   serviceStart: string;
+  serviceTitle: string;
 };
 
 function demoItems() {
@@ -73,8 +77,20 @@ function isServiceName(value: string): value is ServiceName {
   return marketplaceTypes.includes(value as MarketplaceFilter) && value !== "All";
 }
 
+function getInitialCoordinates(searchParams: ReturnType<typeof useSearchParams>) {
+  const lat = Number(searchParams.get("lat"));
+  const lng = Number(searchParams.get("lng"));
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return null;
+  }
+
+  return { lat, lng };
+}
+
 export function MarketplaceBrowser() {
   const searchParams = useSearchParams();
+  const initialCoordinates = getInitialCoordinates(searchParams);
   const initialEvent = searchParams.get("event");
   const eventId = searchParams.get("eventId");
   const initialServices = searchParams
@@ -111,20 +127,22 @@ export function MarketplaceBrowser() {
   const [guestCount, setGuestCount] = useState(
     Number.isFinite(initialGuests) ? initialGuests : 40,
   );
-  const [useHomeVenue, setUseHomeVenue] = useState(false);
+  const [useHomeVenue, setUseHomeVenue] = useState(Boolean(initialCoordinates));
   const [homeAddress, setHomeAddress] = useState(initialLocation);
   const [homeAreaName, setHomeAreaName] = useState(homeAreas[0].name);
   const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
   const [isSearchingAddress, setIsSearchingAddress] = useState(false);
   const [liveCoordinates, setLiveCoordinates] = useState<Coordinates | null>(null);
   const [selectedAddressCoordinates, setSelectedAddressCoordinates] =
-    useState<Coordinates | null>(null);
+    useState<Coordinates | null>(initialCoordinates);
   const [locationStatus, setLocationStatus] = useState("");
   const [cart, setCart] = useState<CartLine[]>([]);
   const [cartMessage, setCartMessage] = useState("");
   const [activeRowId, setActiveRowId] = useState("best-matches");
   const [hoveredItemId, setHoveredItemId] = useState<number | null>(null);
+  const hoverFrameRef = useRef<number | null>(null);
   const [isMobileMapOpen, setIsMobileMapOpen] = useState(false);
+  const [pendingServiceItem, setPendingServiceItem] = useState<MarketplaceItem | null>(null);
   const [selectedMapItemId, setSelectedMapItemId] = useState<number | null>(null);
   const [isRequestingQuotes, setIsRequestingQuotes] = useState(false);
   const durationHours = getHoursBetween(startTime, endTime);
@@ -281,7 +299,19 @@ export function MarketplaceBrowser() {
     startTime,
   ]);
   const canSaveCart = Boolean(profile && savedEvent);
-  const cartedIds = useMemo(() => cart.map((line) => line.item.id), [cart]);
+  const cartedIds = useMemo(
+    () => Array.from(new Set(cart.map((line) => line.item.id))),
+    [cart],
+  );
+  const selectedServiceCountByVendor = useMemo(() => {
+    const counts = new Map<number, number>();
+
+    cart.forEach((line) => {
+      counts.set(line.item.id, (counts.get(line.item.id) ?? 0) + 1);
+    });
+
+    return counts;
+  }, [cart]);
   const marketplaceRows = useMemo(
     () => buildMarketplaceRows(filteredItems),
     [filteredItems],
@@ -310,6 +340,16 @@ export function MarketplaceBrowser() {
 
     return Array.from(pinMap.values());
   }, [activeRow, cart, cartedIds]);
+
+  const setMapHoverItem = useCallback((itemId: number | null) => {
+    if (hoverFrameRef.current) {
+      window.cancelAnimationFrame(hoverFrameRef.current);
+    }
+
+    hoverFrameRef.current = window.requestAnimationFrame(() => {
+      setHoveredItemId((current) => (current === itemId ? current : itemId));
+    });
+  }, []);
 
   useEffect(() => {
     async function loadMarketplace() {
@@ -400,6 +440,15 @@ export function MarketplaceBrowser() {
     return () => observer.disconnect();
   }, [marketplaceRows]);
 
+  useEffect(
+    () => () => {
+      if (hoverFrameRef.current) {
+        window.cancelAnimationFrame(hoverFrameRef.current);
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     if (!useHomeVenue || homeAddress.trim().length < 3) {
       return;
@@ -433,7 +482,10 @@ export function MarketplaceBrowser() {
   }
 
   function getLineQuote(line: CartLine) {
-    return quoteItem(line.item, getLineContext(line));
+    return Math.max(
+      quoteItem(line.item, getLineContext(line)) + line.priceAdjustment,
+      0,
+    );
   }
 
   function toggleService(service: ServiceName) {
@@ -534,8 +586,16 @@ export function MarketplaceBrowser() {
     );
   }
 
-  const addToCart = useCallback(async (item: MarketplaceItem) => {
-    if (cart.some((line) => line.item.id === item.id)) {
+  const addCartLine = useCallback(async (
+    item: MarketplaceItem,
+    serviceOption: MarketplaceServiceOption,
+  ) => {
+    if (
+      cart.some(
+        (line) =>
+          line.item.id === item.id && line.serviceName === serviceOption.service,
+      )
+    ) {
       return;
     }
 
@@ -544,8 +604,11 @@ export function MarketplaceBrowser() {
       id: lineId,
       item,
       persisted: false,
+      priceAdjustment: serviceOption.priceAdjustment ?? 0,
       serviceEnd: endTime,
+      serviceName: serviceOption.service,
       serviceStart: startTime,
+      serviceTitle: serviceOption.title,
     };
 
     setCart((current) => [...current, line]);
@@ -562,18 +625,21 @@ export function MarketplaceBrowser() {
 
     try {
       const supabase = createBrowserSupabaseClient();
-      const estimatedPrice = quoteItem(item, {
-        date: eventDate,
-        durationHours,
-        endTime,
-        guests: guestCount,
-        startTime,
-      });
+      const estimatedPrice = Math.max(
+        quoteItem(item, {
+          date: eventDate,
+          durationHours,
+          endTime,
+          guests: guestCount,
+          startTime,
+        }) + (serviceOption.priceAdjustment ?? 0),
+        0,
+      );
       const cartItem = await createCartItem(supabase, {
         endTime,
         estimatedPrice,
         eventId: savedEvent.id,
-        itemType: item.type === "Venue" ? "venue" : "vendor_service",
+        itemType: serviceOption.service === "Venue" ? "venue" : "vendor_service",
         serviceId: item.serviceId ?? null,
         startTime,
         vendorId: item.vendorId ?? null,
@@ -606,14 +672,36 @@ export function MarketplaceBrowser() {
     startTime,
   ]);
 
-  const removeFromCart = useCallback((itemId: number) => {
-    setCart((current) => current.filter((line) => line.item.id !== itemId));
+  const addToCart = useCallback(async (item: MarketplaceItem) => {
+    const serviceOptions = getSelectableServiceOptions(item);
+
+    if (serviceOptions.length > 1) {
+      setPendingServiceItem(item);
+      return;
+    }
+
+    await addCartLine(item, serviceOptions[0]);
+  }, [addCartLine]);
+
+  const addSelectedServicesToCart = useCallback(async (
+    item: MarketplaceItem,
+    serviceOptions: MarketplaceServiceOption[],
+  ) => {
+    for (const serviceOption of serviceOptions) {
+      await addCartLine(item, serviceOption);
+    }
+
+    setPendingServiceItem(null);
+  }, [addCartLine]);
+
+  const removeFromCart = useCallback((lineId: number) => {
+    setCart((current) => current.filter((line) => line.id !== lineId));
   }, []);
 
   const selectMapItem = useCallback((item: MarketplaceItem) => {
     setSelectedMapItemId(item.id);
     setIsMobileMapOpen(false);
-    const card = document.getElementById(`vendor-card-${item.id}`);
+    const card = document.querySelector(`[data-vendor-id="${item.id}"]`);
 
     card?.scrollIntoView({
       behavior: "smooth",
@@ -640,11 +728,11 @@ export function MarketplaceBrowser() {
   }
 
   async function updateCartTime(
-    itemId: number,
+    lineId: number,
     field: "serviceStart" | "serviceEnd",
     value: string,
   ) {
-    const existingLine = cart.find((line) => line.item.id === itemId);
+    const existingLine = cart.find((line) => line.id === lineId);
     const nextLine = existingLine
       ? {
           ...existingLine,
@@ -654,7 +742,7 @@ export function MarketplaceBrowser() {
 
     setCart((current) =>
       current.map((line) =>
-        line.item.id === itemId ? { ...line, [field]: value } : line,
+        line.id === lineId ? { ...line, [field]: value } : line,
       ),
     );
 
@@ -784,14 +872,14 @@ export function MarketplaceBrowser() {
                   <MarketplaceRow
                     activeItemId={selectedMapItemId}
                     cartedIds={cartedIds}
-                    hoveredItemId={hoveredItemId}
+                    selectedServiceCountByVendor={selectedServiceCountByVendor}
                     rowId={row.id}
                     title={row.title}
                     description={row.description}
                     items={row.items}
                     quoteContext={globalQuoteContext}
                     onAdd={addToCart}
-                    onHoverItem={setHoveredItemId}
+                    onHoverItem={setMapHoverItem}
                     onSelectItem={selectMapItem}
                   />
                 </div>
@@ -820,7 +908,7 @@ export function MarketplaceBrowser() {
               pins={mapPins}
               selectedItemId={selectedMapItemId}
               onAddItem={addToCart}
-              onHoverItem={setHoveredItemId}
+              onHoverItem={setMapHoverItem}
               onSelectItem={selectMapItem}
             />
           </div>
@@ -858,7 +946,7 @@ export function MarketplaceBrowser() {
               pins={mapPins}
               selectedItemId={selectedMapItemId}
               onAddItem={addToCart}
-              onHoverItem={setHoveredItemId}
+              onHoverItem={setMapHoverItem}
               onSelectItem={selectMapItem}
             />
           </div>
@@ -879,6 +967,20 @@ export function MarketplaceBrowser() {
         onToggleExcludedService={toggleExcludedService}
         onToggleService={toggleService}
       />
+
+      {pendingServiceItem ? (
+        <ServiceSelectionDialog
+          item={pendingServiceItem}
+          quoteContext={globalQuoteContext}
+          selectedServices={cart
+            .filter((line) => line.item.id === pendingServiceItem.id)
+            .map((line) => line.serviceName)}
+          onClose={() => setPendingServiceItem(null)}
+          onConfirm={(serviceOptions) =>
+            addSelectedServicesToCart(pendingServiceItem, serviceOptions)
+          }
+        />
+      ) : null}
     </>
   );
 }
@@ -906,6 +1008,168 @@ const curatedFilterServices: ServiceName[] = [
   "Bartending",
   "Cleaning",
 ];
+
+function ServiceSelectionDialog({
+  item,
+  onClose,
+  onConfirm,
+  quoteContext,
+  selectedServices,
+}: {
+  item: MarketplaceItem;
+  onClose: () => void;
+  onConfirm: (serviceOptions: MarketplaceServiceOption[]) => void;
+  quoteContext: QuoteContext;
+  selectedServices: ServiceName[];
+}) {
+  const serviceOptions = getSelectableServiceOptions(item);
+  const [selectedOptionIds, setSelectedOptionIds] = useState<ServiceName[]>(
+    () =>
+      serviceOptions
+        .filter((option) => !selectedServices.includes(option.service))
+        .slice(0, 1)
+        .map((option) => option.service),
+  );
+  const selectedOptions = serviceOptions.filter((option) =>
+    selectedOptionIds.includes(option.service),
+  );
+
+  function toggleService(service: ServiceName) {
+    setSelectedOptionIds((current) =>
+      current.includes(service)
+        ? current.filter((item) => item !== service)
+        : [...current, service],
+    );
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-neutral-950/35 p-4 backdrop-blur-sm sm:items-center"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Select vendor services"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-2xl rounded-[30px] bg-white p-5 shadow-[0_34px_120px_rgba(20,20,20,0.22)]"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
+              {item.name}
+            </p>
+            <h2 className="mt-1 text-2xl font-semibold tracking-tight">
+              What do you want from this vendor?
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-neutral-200 px-4 py-2 text-sm font-semibold transition hover:-translate-y-0.5 hover:border-neutral-950"
+          >
+            Close
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-3">
+          {serviceOptions.map((option) => {
+            const isSelected = selectedOptionIds.includes(option.service);
+            const isAlreadyInCart = selectedServices.includes(option.service);
+
+            return (
+              <button
+                key={option.service}
+                type="button"
+                disabled={isAlreadyInCart}
+                onClick={() => toggleService(option.service)}
+                className={`rounded-3xl border p-4 text-left transition hover:-translate-y-0.5 disabled:cursor-default disabled:opacity-60 disabled:hover:translate-y-0 ${
+                  isSelected
+                    ? "border-neutral-950 bg-neutral-950 text-white"
+                    : "border-neutral-200 bg-[#fbfbfa] text-neutral-950 hover:border-neutral-400"
+                }`}
+              >
+                <span className="flex items-start justify-between gap-4">
+                  <span>
+                    <span className="block text-base font-semibold">
+                      {option.title}
+                    </span>
+                    <span
+                      className={`mt-1 block text-xs font-semibold ${
+                        isSelected ? "text-neutral-300" : "text-neutral-500"
+                      }`}
+                    >
+                      {option.service}
+                    </span>
+                  </span>
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                      isSelected
+                        ? "bg-white text-neutral-950"
+                        : "bg-white text-neutral-700"
+                    }`}
+                  >
+                    {isAlreadyInCart
+                      ? "In cart"
+                      : `$${getServiceOptionQuote(item, option, quoteContext).toLocaleString()}`}
+                  </span>
+                </span>
+                <span
+                  className={`mt-3 block text-sm leading-6 ${
+                    isSelected ? "text-neutral-200" : "text-neutral-600"
+                  }`}
+                >
+                  {option.description}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-5 flex flex-col gap-3 border-t border-neutral-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm font-semibold text-neutral-600">
+            {selectedOptions.length
+              ? `${selectedOptions.length} service${selectedOptions.length === 1 ? "" : "s"} selected`
+              : "Select at least one service to add."}
+          </p>
+          <button
+            type="button"
+            disabled={!selectedOptions.length}
+            onClick={() => onConfirm(selectedOptions)}
+            className="h-12 rounded-full bg-neutral-950 px-6 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0"
+          >
+            Add selected services
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function getSelectableServiceOptions(item: MarketplaceItem): MarketplaceServiceOption[] {
+  if (item.serviceOptions?.length) {
+    return item.serviceOptions;
+  }
+
+  const services = [item.type, ...item.services].filter(
+    (service, index, allServices) => allServices.indexOf(service) === index,
+  );
+
+  return services.map((service) => ({
+    description: `${service} support from ${item.name}.`,
+    estimateLabel: item.price,
+    service,
+    title: service,
+  }));
+}
+
+function getServiceOptionQuote(
+  item: MarketplaceItem,
+  option: MarketplaceServiceOption,
+  quoteContext: QuoteContext,
+) {
+  return Math.max(quoteItem(item, quoteContext) + (option.priceAdjustment ?? 0), 0);
+}
 
 function EventContextPanel({
   endTime,

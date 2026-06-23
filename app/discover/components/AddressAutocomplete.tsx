@@ -1,15 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import {
+  searchAddressSuggestions,
+  type AddressSuggestion as GeocodingSuggestion,
+} from "@/lib/maps/geocoding";
 
-export type AddressSuggestion = {
+export type AddressSuggestion = GeocodingSuggestion & {
   address: string;
-  coordinates: {
-    lat: number;
-    lng: number;
-  };
   context: "likely_home" | "likely_venue";
-  label: string;
   neighborhood: string;
 };
 
@@ -21,44 +20,6 @@ type AddressAutocompleteProps = {
   selectedAddress?: string;
 };
 
-const mockAddressSuggestions: AddressSuggestion[] = [
-  {
-    address: "743 S Lucerne Blvd, Los Angeles, CA 90005",
-    context: "likely_venue",
-    coordinates: { lat: 34.0615, lng: -118.3245 },
-    label: "The Ebell of Los Angeles",
-    neighborhood: "Mid-Wilshire",
-  },
-  {
-    address: "665 W Jefferson Blvd, Los Angeles, CA 90007",
-    context: "likely_venue",
-    coordinates: { lat: 34.0238, lng: -118.2819 },
-    label: "Shrine Auditorium & Expo Hall",
-    neighborhood: "University Park",
-  },
-  {
-    address: "7001 Franklin Ave, Hollywood, CA 90028",
-    context: "likely_venue",
-    coordinates: { lat: 34.1041, lng: -118.3417 },
-    label: "The Magic Castle",
-    neighborhood: "Hollywood",
-  },
-  {
-    address: "2651 S La Cienega Blvd, Los Angeles, CA 90034",
-    context: "likely_venue",
-    coordinates: { lat: 34.0332, lng: -118.3769 },
-    label: "SmogShoppe",
-    neighborhood: "Culver City",
-  },
-  {
-    address: "123 Maple Ave, Los Angeles, CA 90004",
-    context: "likely_home",
-    coordinates: { lat: 34.0762, lng: -118.3091 },
-    label: "Private residence",
-    neighborhood: "Los Angeles",
-  },
-];
-
 export function AddressAutocomplete({
   label,
   onChange,
@@ -67,20 +28,35 @@ export function AddressAutocomplete({
   value,
 }: AddressAutocompleteProps) {
   const [isFocused, setIsFocused] = useState(false);
-  const suggestions = useMemo(() => {
-    const query = value.trim().toLowerCase();
+  const [isSearching, setIsSearching] = useState(false);
+  const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
 
-    if (!query) {
-      return mockAddressSuggestions.slice(0, 3);
-    }
+  useEffect(() => {
+    const query = value.trim();
 
-    return mockAddressSuggestions
-      .filter((suggestion) =>
-        `${suggestion.label} ${suggestion.address} ${suggestion.neighborhood}`
-          .toLowerCase()
-          .includes(query),
-      )
-      .slice(0, 4);
+    let isActive = true;
+    const debounceId = window.setTimeout(async () => {
+      if (query.length < 3) {
+        if (isActive) {
+          setSuggestions([]);
+          setIsSearching(false);
+        }
+        return;
+      }
+
+      setIsSearching(true);
+      const nextSuggestions = await searchAddressSuggestions(query);
+
+      if (isActive) {
+        setSuggestions(nextSuggestions.map(normalizeSuggestion));
+        setIsSearching(false);
+      }
+    }, query.length < 3 ? 0 : 240);
+
+    return () => {
+      isActive = false;
+      window.clearTimeout(debounceId);
+    };
   }, [value]);
 
   return (
@@ -97,11 +73,16 @@ export function AddressAutocomplete({
         />
       </label>
 
-      {isFocused && suggestions.length ? (
+      {isFocused && (isSearching || suggestions.length) ? (
         <div className="absolute left-0 right-0 top-[76px] z-30 overflow-hidden rounded-2xl border border-neutral-200 bg-white p-2 shadow-[0_22px_70px_rgba(20,20,20,0.16)]">
+          {isSearching ? (
+            <p className="px-3 py-3 text-xs font-semibold text-neutral-500">
+              Finding address matches...
+            </p>
+          ) : null}
           {suggestions.map((suggestion) => (
             <button
-              key={suggestion.address}
+              key={suggestion.id}
               type="button"
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => onSelect(suggestion)}
@@ -131,6 +112,9 @@ export function AddressAutocomplete({
           <p className="mt-1 text-sm font-semibold text-neutral-800">
             {selectedAddress}
           </p>
+          <p className="mt-1 text-xs font-semibold text-neutral-500">
+            This location is now the event anchor for nearby matching.
+          </p>
           <div className="relative mt-3 h-36 overflow-hidden rounded-2xl bg-[linear-gradient(135deg,#e9eee8,#f7f3ed)]">
             <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.45)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.45)_1px,transparent_1px)] bg-[size:30px_30px]" />
             <div className="absolute left-1/2 top-1/2 flex h-10 w-10 -translate-x-1/2 -translate-y-full items-center justify-center rounded-full bg-neutral-950 text-sm font-semibold text-white shadow-[0_18px_42px_rgba(20,20,20,0.28)]">
@@ -141,4 +125,13 @@ export function AddressAutocomplete({
       ) : null}
     </div>
   );
+}
+
+function normalizeSuggestion(suggestion: GeocodingSuggestion): AddressSuggestion {
+  return {
+    ...suggestion,
+    address: suggestion.label,
+    context: suggestion.placeType === "venue" ? "likely_venue" : "likely_home",
+    neighborhood: suggestion.label.split(",").at(-2)?.trim() ?? suggestion.label,
+  };
 }

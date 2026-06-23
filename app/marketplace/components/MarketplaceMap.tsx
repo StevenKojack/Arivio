@@ -31,6 +31,7 @@ type MarketplaceMapProps = {
 const categoryColors: Partial<Record<ServiceName, string>> = {
   Venue: "#111111",
   Catering: "#7a4f2b",
+  "Cake & Desserts": "#be123c",
   DJ: "#4f46e5",
   "Live Music": "#4f46e5",
   Balloons: "#be185d",
@@ -49,6 +50,13 @@ const categoryColors: Partial<Record<ServiceName, string>> = {
   Valet: "#0369a1",
   Cleaning: "#475569",
   "Portable Restrooms": "#475569",
+  "AV Production": "#334155",
+  "Booth Rentals": "#0f766e",
+  Registration: "#334155",
+  Invitations: "#be185d",
+  "Printed Materials": "#475569",
+  "Printed Programs": "#475569",
+  "Live Streaming": "#334155",
 };
 
 const fallbackBounds = {
@@ -274,14 +282,14 @@ export function MarketplaceMap({
     if (!visiblePoints.length) {
       map.easeTo({
         center: [center.lng, center.lat],
-        duration: 450,
+        duration: 240,
         zoom: 9,
       });
       return;
     }
 
     map.fitBounds(nextBounds, {
-      duration: 650,
+      duration: 280,
       maxZoom: eventCoordinates ? 12 : 10.5,
       padding: isSheet
         ? { bottom: 86, left: 36, right: 36, top: 82 }
@@ -432,8 +440,10 @@ function createProviderMarker({
   const marker = document.createElement("button");
   marker.type = "button";
   marker.dataset.arivioItemId = String(item.id);
+  marker.dataset.arivioCarted = String(isCarted);
   marker.innerHTML = `
     <span class="relative z-10">${getServiceIcon(item.type, 18)}</span>
+    ${isCarted ? '<span class="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-emerald-600 text-[10px] font-black text-white">✓</span>' : ""}
     <span class="absolute -bottom-1.5 left-1/2 h-3.5 w-3.5 -translate-x-1/2 rotate-45 rounded-[3px] border-b-2 border-r-2 border-white" style="background:${isCarted ? "#256f4a" : color};"></span>
   `;
   marker.style.backgroundColor = isCarted ? "#256f4a" : color;
@@ -453,8 +463,10 @@ function createProviderMarker({
     "duration-200",
     "ease-out",
     "hover:scale-110",
+    "hover:ring-4",
+    "hover:ring-neutral-950/10",
     "hover:shadow-[0_24px_56px_rgba(20,20,20,0.28)]",
-    isCarted ? "ring-4 ring-emerald-600/25" : "",
+    isCarted ? "ring-4 ring-emerald-600/30" : "",
     isActive ? "" : "opacity-80",
   ]
     .filter(Boolean)

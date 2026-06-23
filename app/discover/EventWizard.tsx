@@ -6,6 +6,8 @@ import { useSearchParams } from "next/navigation";
 import {
   allServices,
   getHoursBetween,
+  getDistanceMiles,
+  homeAreas,
   type ServiceName,
 } from "../data/marketplace";
 import {
@@ -57,6 +59,7 @@ const mockVenuePins = [
     label: "The Ebell of Los Angeles",
     match: "Elegant indoor venue",
     neighborhood: "Mid-Wilshire",
+    coordinates: { lat: 34.0607, lng: -118.3246 },
     position: { x: 42, y: 46 },
   },
   {
@@ -66,6 +69,7 @@ const mockVenuePins = [
     label: "Shrine Auditorium",
     match: "Best for conventions and fundraisers",
     neighborhood: "University Park",
+    coordinates: { lat: 34.0237, lng: -118.2811 },
     position: { x: 56, y: 66 },
   },
   {
@@ -75,6 +79,7 @@ const mockVenuePins = [
     label: "SmogShoppe",
     match: "Warm social gatherings",
     neighborhood: "Culver City",
+    coordinates: { lat: 34.0319, lng: -118.3777 },
     position: { x: 28, y: 58 },
   },
   {
@@ -84,6 +89,7 @@ const mockVenuePins = [
     label: "The Magic Castle",
     match: "Memorable entertainment-led events",
     neighborhood: "Hollywood",
+    coordinates: { lat: 34.1046, lng: -118.3427 },
     position: { x: 64, y: 30 },
   },
 ];
@@ -130,6 +136,7 @@ export function EventWizard() {
     (service) => !recognition.excludedServices.includes(service),
   );
   const locationSummary = getLocationSummary(locations);
+  const eventAnchor = locations.find((location) => location.coordinates)?.coordinates;
   const durationHours = getHoursBetween(timing.startTime, timing.endTime);
   const marketplaceHref = useMemo(() => {
     const profile = recognition.profile;
@@ -148,12 +155,20 @@ export function EventWizard() {
       params.set("notes", planAdditions.map((addition) => addition.label).join(", "));
     }
 
+    if (eventAnchor) {
+      params.set("lat", String(eventAnchor.lat));
+      params.set("lng", String(eventAnchor.lng));
+      params.set("locationContext", locations[0]?.context || "venue_needed");
+    }
+
     return `/marketplace?${params.toString()}`;
   }, [
     budget,
     durationHours,
+    eventAnchor,
     guestCount,
     locationSummary,
+    locations,
     planAdditions,
     recognition.profile,
     timing.date,
@@ -421,6 +436,7 @@ export function EventWizard() {
                 onSelectVenue={(venue) =>
                   updateLocation(locations[0].id, {
                     context: "likely_venue",
+                    coordinates: venue.coordinates,
                     kind: "Venue needed",
                     mode: "needs_venue",
                     query: venue.neighborhood,
@@ -799,6 +815,57 @@ function LocationStep({
   onUpdate: (updates: Partial<EventLocation>) => void;
 }) {
   const selectedVenue = mockVenuePins.find((venue) => venue.id === location.selectedVenueId);
+  const [locationMessage, setLocationMessage] = useState("");
+
+  function useCurrentLocation() {
+    setLocationMessage("");
+
+    if (!navigator.geolocation) {
+      setLocationMessage("Your browser does not support current location.");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const coordinates = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+        const nearestArea = getNearestHomeArea(coordinates);
+
+        onUpdate({
+          context: "venue_needed",
+          coordinates,
+          query: nearestArea ? `Current location near ${nearestArea.name}` : "Current location",
+          selectedAddress: "",
+          selectedLabel: "Current location",
+          selectedVenueId: undefined,
+        });
+        setLocationMessage("Current location is now the anchor for venue matching.");
+      },
+      () => {
+        setLocationMessage("Location permission was blocked or unavailable.");
+      },
+      { enableHighAccuracy: true, maximumAge: 60000, timeout: 10000 },
+    );
+  }
+
+  function updateAreaQuery(value: string) {
+    const matchedArea = getMatchingHomeArea(value);
+
+    onUpdate({
+      context: "venue_needed",
+      coordinates: matchedArea?.coordinates,
+      query: value,
+      selectedAddress: "",
+      selectedLabel: matchedArea ? matchedArea.name : "",
+      selectedVenueId: undefined,
+    });
+
+    if (matchedArea) {
+      setLocationMessage(`${matchedArea.name} is now the anchor for venue matching.`);
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -867,15 +934,7 @@ function LocationStep({
               <div className="mt-5 grid gap-3">
                 <button
                   type="button"
-                  onClick={() =>
-                    onUpdate({
-                      context: "venue_needed",
-                      query: "Current location",
-                      selectedAddress: "",
-                      selectedLabel: "",
-                      selectedVenueId: undefined,
-                    })
-                  }
+                  onClick={useCurrentLocation}
                   className="h-12 rounded-full bg-neutral-950 px-5 text-sm font-semibold text-white shadow-[0_16px_36px_rgba(20,20,20,0.18)] transition hover:-translate-y-0.5 hover:bg-neutral-800"
                 >
                   Use my current location
@@ -884,20 +943,17 @@ function LocationStep({
                   Search city or area
                   <input
                     value={location.query}
-                    onChange={(event) =>
-                      onUpdate({
-                        context: "venue_needed",
-                        query: event.target.value,
-                        selectedAddress: "",
-                        selectedLabel: "",
-                        selectedVenueId: undefined,
-                      })
-                    }
+                    onChange={(event) => updateAreaQuery(event.target.value)}
                     placeholder="Los Angeles, Glendale, Pasadena..."
                     className="mt-2 h-12 w-full rounded-2xl border border-neutral-200 bg-white px-4 text-sm font-semibold outline-none transition focus:border-neutral-950"
                   />
                 </label>
               </div>
+              {locationMessage ? (
+                <p className="mt-3 rounded-2xl bg-[#fbfbfa] px-4 py-3 text-xs font-semibold text-neutral-600">
+                  {locationMessage}
+                </p>
+              ) : null}
               <div className="mt-5 space-y-2">
                 {mockVenuePins.map((venue) => (
                   <button
@@ -1288,6 +1344,27 @@ function getLocationSummary(locations: EventLocation[]) {
       return `${location.kind}: ${value}`;
     })
     .join(" | ");
+}
+
+function getMatchingHomeArea(value: string) {
+  const normalizedValue = value.trim().toLowerCase();
+
+  if (normalizedValue.length < 3) {
+    return undefined;
+  }
+
+  return homeAreas.find((area) =>
+    area.name.toLowerCase().includes(normalizedValue),
+  );
+}
+
+function getNearestHomeArea(coordinates: { lat: number; lng: number }) {
+  return homeAreas
+    .map((area) => ({
+      area,
+      distance: getDistanceMiles(coordinates, area.coordinates),
+    }))
+    .sort((a, b) => a.distance - b.distance)[0]?.area;
 }
 
 function getConfirmationTitle(recognition: ReturnType<typeof recognizeEventIntent>) {

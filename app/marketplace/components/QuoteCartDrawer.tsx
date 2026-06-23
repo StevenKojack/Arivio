@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { isAvailableAt, type MarketplaceItem } from "@/app/data/marketplace";
+import { isAvailableAt, type MarketplaceItem, type ServiceName } from "@/app/data/marketplace";
 import { getTimeOptions } from "@/lib/utils/format";
 
 export type QuoteCartLine = {
@@ -9,8 +9,11 @@ export type QuoteCartLine = {
   id: number;
   item: MarketplaceItem;
   persisted: boolean;
+  priceAdjustment: number;
   serviceEnd: string;
+  serviceName: ServiceName;
   serviceStart: string;
+  serviceTitle: string;
 };
 
 type QuoteCartDrawerProps = {
@@ -21,10 +24,10 @@ type QuoteCartDrawerProps = {
   getLineQuote: (line: QuoteCartLine) => number;
   isRequestingQuotes: boolean;
   variant?: "panel" | "compact" | "bar";
-  onRemove: (itemId: number) => void;
+  onRemove: (lineId: number) => void;
   onRequestQuotes: () => void;
   onUpdateTime: (
-    itemId: number,
+    lineId: number,
     field: "serviceStart" | "serviceEnd",
     value: string,
   ) => void;
@@ -136,7 +139,7 @@ export function QuoteCartDrawer({
         {cart.length ? (
           (isCompact ? cart.slice(0, 3) : cart).map((line) => (
             <CartLineCard
-              key={line.item.id}
+              key={line.id}
               compact={isCompact}
               line={line}
               quote={getLineQuote(line)}
@@ -185,9 +188,9 @@ function CartLineCard({
 }: {
   compact?: boolean;
   line: QuoteCartLine;
-  onRemove: (itemId: number) => void;
+  onRemove: (lineId: number) => void;
   onUpdateTime: (
-    itemId: number,
+    lineId: number,
     field: "serviceStart" | "serviceEnd",
     value: string,
   ) => void;
@@ -206,12 +209,12 @@ function CartLineCard({
         <div>
           <p className="font-semibold text-neutral-950">{line.item.name}</p>
           <p className="mt-1 text-xs font-medium text-neutral-500">
-            {line.item.type} - {line.item.pricing.label}
+            {line.serviceTitle} - {line.item.pricing.label}
           </p>
         </div>
         <button
           type="button"
-          onClick={() => onRemove(line.item.id)}
+          onClick={() => onRemove(line.id)}
           className="text-xs font-semibold text-neutral-500 transition hover:text-neutral-950"
         >
           Remove
@@ -222,12 +225,12 @@ function CartLineCard({
           <CartTimeField
             label="Start"
             value={line.serviceStart}
-            onChange={(value) => onUpdateTime(line.item.id, "serviceStart", value)}
+            onChange={(value) => onUpdateTime(line.id, "serviceStart", value)}
           />
           <CartTimeField
             label="End"
             value={line.serviceEnd}
-            onChange={(value) => onUpdateTime(line.item.id, "serviceEnd", value)}
+            onChange={(value) => onUpdateTime(line.id, "serviceEnd", value)}
           />
         </div>
       ) : null}

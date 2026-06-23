@@ -72,6 +72,14 @@ export type AvailabilityWindow = {
   end: string;
 };
 
+export type MarketplaceServiceOption = {
+  description: string;
+  estimateLabel: string;
+  priceAdjustment?: number;
+  service: ServiceName;
+  title: string;
+};
+
 export type MarketplaceItem = {
   id: number;
   databaseSource?: boolean;
@@ -92,6 +100,7 @@ export type MarketplaceItem = {
   blockedDates?: string[];
   sourceLabel: string;
   sourceUrl: string;
+  serviceOptions?: MarketplaceServiceOption[];
   serviceRadiusMiles?: number;
   vendorId?: string | null;
   serviceId?: string | null;
@@ -507,6 +516,28 @@ export const marketplaceItems: MarketplaceItem[] = [
     reviewCount: 480,
     sourceLabel: "Official site",
     sourceUrl: "https://www.magiccastle.com/",
+    serviceOptions: [
+      {
+        description: "Private room or group admission anchored around the club.",
+        estimateLabel: "$3,200 venue estimate",
+        service: "Venue",
+        title: "Venue access",
+      },
+      {
+        description: "Magic-forward entertainment package for birthdays and private groups.",
+        estimateLabel: "$950 show package estimate",
+        priceAdjustment: -2250,
+        service: "Magic",
+        title: "Entertainment/show package",
+      },
+      {
+        description: "Dinner and hospitality package for guests before or after shows.",
+        estimateLabel: "$115 / guest estimate",
+        priceAdjustment: 1400,
+        service: "Catering",
+        title: "Dining package",
+      },
+    ],
     tags: ["birthday", "magic", "private-party", "entertainment", "dining"],
   },
   {
@@ -780,6 +811,28 @@ export const marketplaceItems: MarketplaceItem[] = [
     reviewCount: 165,
     sourceLabel: "Official site",
     sourceUrl: "https://scootersjungle.com/",
+    serviceOptions: [
+      {
+        description: "Private indoor kids venue for the core party window.",
+        estimateLabel: "$950 venue estimate",
+        service: "Venue",
+        title: "Kids party venue",
+      },
+      {
+        description: "Play and bounce entertainment for the active part of the party.",
+        estimateLabel: "$420 play package estimate",
+        priceAdjustment: -530,
+        service: "Character Performers",
+        title: "Bounce/play entertainment",
+      },
+      {
+        description: "Party host support for setup, flow, and guest help.",
+        estimateLabel: "$240 host package estimate",
+        priceAdjustment: -710,
+        service: "Staffing",
+        title: "Party host package",
+      },
+    ],
     tags: ["kids", "birthday", "indoor-play", "family-friendly", "private-party"],
   },
   {
@@ -793,7 +846,7 @@ export const marketplaceItems: MarketplaceItem[] = [
     capacity: "Racing parties and corporate groups",
     rating: 4.5,
     events: ["Birthday", "Corporate", "Graduation", "Private Party"],
-    services: ["Venue", "Catering", "Staffing"],
+    services: ["Venue", "Catering", "Staffing", "Character Performers"],
     description: "Indoor kart racing venue for active birthdays, team outings, and private group events.",
     pricing: { kind: "flat", basePrice: 1450, label: "group racing estimate" },
     availability: [{ days: [...everyDay], start: "11:00", end: "22:00" }],
@@ -803,6 +856,28 @@ export const marketplaceItems: MarketplaceItem[] = [
     reviewCount: 210,
     sourceLabel: "Official site",
     sourceUrl: "https://mb2raceway.com/",
+    serviceOptions: [
+      {
+        description: "Party room or group event space for the gathering.",
+        estimateLabel: "$1,450 venue estimate",
+        service: "Venue",
+        title: "Party venue",
+      },
+      {
+        description: "Go-kart racing experience for guests.",
+        estimateLabel: "$900 activity estimate",
+        priceAdjustment: -550,
+        service: "Character Performers",
+        title: "Go-kart entertainment",
+      },
+      {
+        description: "Food package for the group after racing.",
+        estimateLabel: "$32 / guest estimate",
+        priceAdjustment: 450,
+        service: "Catering",
+        title: "Food package",
+      },
+    ],
     tags: ["racing", "activity", "birthday", "corporate", "team-event"],
   },
   {
@@ -826,6 +901,28 @@ export const marketplaceItems: MarketplaceItem[] = [
     reviewCount: 195,
     sourceLabel: "Official site",
     sourceUrl: "https://noorevents.com/",
+    serviceOptions: [
+      {
+        description: "Ballroom or terrace event space.",
+        estimateLabel: "$4,200 venue estimate",
+        service: "Venue",
+        title: "Venue package",
+      },
+      {
+        description: "In-house banquet food and service package.",
+        estimateLabel: "$95 / guest estimate",
+        priceAdjustment: 1800,
+        service: "Catering",
+        title: "Catering package",
+      },
+      {
+        description: "Basic lighting and sound support for the room.",
+        estimateLabel: "$850 production estimate",
+        priceAdjustment: -3350,
+        service: "AV Production",
+        title: "AV package",
+      },
+    ],
     tags: ["banquet", "wedding", "ballroom", "pasadena", "formal"],
   },
   {
@@ -849,6 +946,28 @@ export const marketplaceItems: MarketplaceItem[] = [
     reviewCount: 260,
     sourceLabel: "Official site",
     sourceUrl: "https://www.taglyancomplex.com/",
+    serviceOptions: [
+      {
+        description: "Grand ballroom rental for the event.",
+        estimateLabel: "$7,200 venue estimate",
+        service: "Venue",
+        title: "Ballroom venue",
+      },
+      {
+        description: "Formal banquet catering package.",
+        estimateLabel: "$135 / guest estimate",
+        priceAdjustment: 2800,
+        service: "Catering",
+        title: "Banquet catering",
+      },
+      {
+        description: "Room presentation, lighting, and decor support.",
+        estimateLabel: "$2,400 decor package estimate",
+        priceAdjustment: -4800,
+        service: "AV Production",
+        title: "Decor and production package",
+      },
+    ],
     tags: ["banquet", "wedding", "gala", "hollywood", "luxury"],
   },
   {

@@ -1,10 +1,12 @@
 "use client";
 
+import { memo } from "react";
 import type { MarketplaceItem } from "@/app/data/marketplace";
 import { getVendorImage } from "@/lib/marketplace/vendorImages";
 
 type VendorCardProps = {
   buttonLabel?: string;
+  disableAdd?: boolean;
   isHighlighted?: boolean;
   isSelected?: boolean;
   item: MarketplaceItem;
@@ -16,8 +18,9 @@ type VendorCardProps = {
   onSelect?: (item: MarketplaceItem) => void;
 };
 
-export function VendorCard({
+function VendorCardComponent({
   buttonLabel = "Add to quote",
+  disableAdd,
   isHighlighted = false,
   isSelected = false,
   item,
@@ -113,7 +116,7 @@ export function VendorCard({
           </div>
           <button
             type="button"
-            disabled={isSelected}
+            disabled={disableAdd ?? isSelected}
             onClick={(event) => {
               event.stopPropagation();
               onAdd(item);
@@ -131,3 +134,5 @@ export function VendorCard({
     </article>
   );
 }
+
+export const VendorCard = memo(VendorCardComponent);

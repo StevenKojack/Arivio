@@ -57,15 +57,16 @@ export function getVendorImage(item: MarketplaceItem) {
   }
 
   if (item.name.toLowerCase().includes("scooter")) {
-    return "https://images.unsplash.com/photo-1560506840-ec148e82a604?auto=format&fit=crop&w=900&q=80";
+    return "https://images.unsplash.com/photo-1560506840-ec148e82a604?auto=format&fit=crop&w=640&q=70";
   }
 
   if (item.name.toLowerCase().includes("raceway")) {
-    return "https://images.unsplash.com/photo-1525609004556-c46c7d6cf023?auto=format&fit=crop&w=900&q=80";
+    return "https://images.unsplash.com/photo-1525609004556-c46c7d6cf023?auto=format&fit=crop&w=640&q=70";
   }
 
-  return (
+  const imageUrl =
     categoryImages[item.type] ??
-    "https://images.unsplash.com/photo-1527529482837-4698179dc6ce?auto=format&fit=crop&w=900&q=80"
-  );
+    "https://images.unsplash.com/photo-1527529482837-4698179dc6ce?auto=format&fit=crop&w=900&q=80";
+
+  return imageUrl.replace("w=900&q=80", "w=640&q=70");
 }

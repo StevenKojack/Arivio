@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { quoteItem, type MarketplaceItem, type QuoteContext } from "@/app/data/marketplace";
 import { VendorCard } from "./VendorCard";
 
@@ -7,10 +8,10 @@ type MarketplaceRowProps = {
   activeItemId?: number | null;
   cartedIds?: number[];
   description?: string;
-  hoveredItemId?: number | null;
   items: MarketplaceItem[];
   quoteContext: QuoteContext;
   rowId: string;
+  selectedServiceCountByVendor?: Map<number, number>;
   title: string;
   onAdd: (item: MarketplaceItem) => void;
   onHoverItem?: (itemId: number | null) => void;
@@ -21,13 +22,13 @@ export function MarketplaceRow({
   activeItemId,
   cartedIds = [],
   description,
-  hoveredItemId,
   items,
   onAdd,
   onHoverItem,
   onSelectItem,
   quoteContext,
   rowId,
+  selectedServiceCountByVendor,
   title,
 }: MarketplaceRowProps) {
   if (!items.length) {
@@ -50,17 +51,30 @@ export function MarketplaceRow({
         </span>
       </div>
       <div className="mt-4 flex min-w-0 snap-x gap-4 overflow-x-auto overscroll-x-contain scroll-smooth pb-3 [scrollbar-width:thin]">
-        {items.map((item, index) => (
+        {items.map((item, index) => {
+          const selectedServiceCount = selectedServiceCountByVendor?.get(item.id) ?? 0;
+          const canAddMoreServices =
+            (item.serviceOptions?.length ?? item.services.length) > selectedServiceCount;
+
+          return (
           <div
             key={`${title}-${item.id}`}
-            id={`vendor-card-${item.id}`}
+            id={`vendor-card-${rowId}-${item.id}`}
             data-row-id={rowId}
+            data-vendor-id={item.id}
             className="w-[min(74vw,310px)] shrink-0 snap-start 2xl:w-[326px]"
           >
             <VendorCard
-              buttonLabel={cartedIds.includes(item.id) ? "Selected" : "Add to quote"}
-              isHighlighted={hoveredItemId === item.id || activeItemId === item.id}
+              buttonLabel={
+                selectedServiceCount > 1
+                  ? `${selectedServiceCount} selected`
+                  : selectedServiceCount === 1
+                    ? "Selected"
+                    : "Add to quote"
+              }
+              isHighlighted={activeItemId === item.id}
               isSelected={cartedIds.includes(item.id)}
+              disableAdd={selectedServiceCount > 0 && !canAddMoreServices}
               item={item}
               matchLabel={cartedIds.includes(item.id) ? "Selected" : index < 3 ? "Top match" : "Match"}
               matchReason={getMatchReason(title, item)}
@@ -70,11 +84,14 @@ export function MarketplaceRow({
               onSelect={onSelectItem}
             />
           </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
 }
+
+export const MemoizedMarketplaceRow = memo(MarketplaceRow);
 
 function getMatchReason(title: string, item: MarketplaceItem) {
   if (title === "Best matches") {
