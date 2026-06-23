@@ -705,35 +705,32 @@ export function MarketplaceBrowser() {
 
   return (
     <>
-      <div className="hidden xl:sticky xl:top-20 xl:z-40 xl:mb-5 xl:flex xl:justify-end">
-        <div className="w-[min(420px,46vw)]">{renderQuoteCart("compact")}</div>
-      </div>
+      <div className="relative min-h-[calc(100vh-5rem)] w-full overflow-hidden rounded-[32px] border border-white/70 bg-white/45 p-3 shadow-[0_24px_80px_rgba(20,20,20,0.08)] backdrop-blur sm:p-4">
+        <EventContextPanel
+          eventDate={eventDate}
+          eventLocationLabel={eventLocationLabel}
+          guestCount={guestCount}
+          initialNotes={initialNotes}
+          marketplaceMessage={marketplaceMessage}
+          planSummary={planSummary}
+          serviceSummary={serviceSummary}
+          startTime={startTime}
+          endTime={endTime}
+          useHomeVenue={useHomeVenue}
+          homeAddress={homeAddress}
+          addressSuggestions={addressSuggestions}
+          isSearchingAddress={isSearchingAddress}
+          locationStatus={locationStatus}
+          providerCount={providerEstimates.length}
+          onHomeAddressChange={updateHomeAddress}
+          onOpenFilters={() => setIsFilterDrawerOpen(true)}
+          onSelectAddressSuggestion={selectAddressSuggestion}
+          onToggleHomeVenue={() => setUseHomeVenue((current) => !current)}
+          onUseCurrentLocation={useCurrentLocation}
+        />
 
-      <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(460px,1fr)] xl:items-start">
-        <div className="min-w-0 space-y-6">
-          <EventContextPanel
-            eventDate={eventDate}
-            eventLocationLabel={eventLocationLabel}
-            guestCount={guestCount}
-            initialNotes={initialNotes}
-            marketplaceMessage={marketplaceMessage}
-            planSummary={planSummary}
-            serviceSummary={serviceSummary}
-            startTime={startTime}
-            endTime={endTime}
-            useHomeVenue={useHomeVenue}
-            homeAddress={homeAddress}
-            addressSuggestions={addressSuggestions}
-            isSearchingAddress={isSearchingAddress}
-            locationStatus={locationStatus}
-            providerCount={providerEstimates.length}
-            onHomeAddressChange={updateHomeAddress}
-            onOpenFilters={() => setIsFilterDrawerOpen(true)}
-            onSelectAddressSuggestion={selectAddressSuggestion}
-            onToggleHomeVenue={() => setUseHomeVenue((current) => !current)}
-            onUseCurrentLocation={useCurrentLocation}
-          />
-
+        <div className="mt-4 grid min-w-0 gap-4 xl:grid-cols-[minmax(0,58%)_minmax(440px,42%)] xl:items-start">
+          <div className="min-w-0 space-y-5 pb-28 xl:pb-4">
           <div className="xl:hidden">
             <button
               type="button"
@@ -779,20 +776,26 @@ export function MarketplaceBrowser() {
           )}
         </div>
 
-        <aside className="hidden min-w-0 xl:block" aria-label="Persistent marketplace map">
-          <MarketplaceMap
-            activeCategory={activeRow?.title ?? "Best matches"}
-            cartedIds={cartedIds}
-            eventCoordinates={eventCoordinates}
-            hoveredItemId={hoveredItemId}
-            layout="sticky"
-            pins={mapPins}
-            selectedItemId={selectedMapItemId}
-            onAddItem={addToCart}
-            onHoverItem={setHoveredItemId}
-            onSelectItem={selectMapItem}
-          />
+        <aside className="relative hidden min-w-0 xl:block" aria-label="Persistent marketplace map">
+          <div className="sticky top-3">
+            <MarketplaceMap
+              activeCategory={activeRow?.title ?? "Best matches"}
+              cartedIds={cartedIds}
+              eventCoordinates={eventCoordinates}
+              hoveredItemId={hoveredItemId}
+              layout="sticky"
+              pins={mapPins}
+              selectedItemId={selectedMapItemId}
+              onAddItem={addToCart}
+              onHoverItem={setHoveredItemId}
+              onSelectItem={selectMapItem}
+            />
+            <div className="absolute right-4 top-4 z-30 w-[min(360px,36vw)]">
+              {renderQuoteCart("compact")}
+            </div>
+          </div>
         </aside>
+        </div>
       </div>
 
       {isMobileMapOpen ? (
@@ -900,57 +903,32 @@ function EventContextPanel({
   onUseCurrentLocation: () => void;
 }) {
   return (
-    <section className="rounded-[34px] border border-neutral-200 bg-[linear-gradient(135deg,#ffffff,#fbfbfa)] p-5 shadow-[0_22px_70px_rgba(20,20,20,0.08)]">
-      <div className="flex items-start justify-between gap-4">
-        <div>
+    <section className="rounded-[24px] border border-neutral-200 bg-white/92 p-3 shadow-[0_14px_44px_rgba(20,20,20,0.055)] backdrop-blur sm:p-4">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+        <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
-            Event command center
+            Marketplace
           </p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">
+          <h2 className="mt-1 truncate text-xl font-semibold tracking-tight text-neutral-950">
             {planSummary || "Vendor marketplace"}
           </h2>
-          <p className="mt-2 text-sm leading-6 text-neutral-600">
+          <p className="mt-1 line-clamp-1 text-sm text-neutral-600">
             {marketplaceMessage}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onOpenFilters}
-          className="shrink-0 rounded-full border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-950 transition hover:-translate-y-0.5 hover:border-neutral-950"
-        >
-          Refine
-        </button>
-      </div>
-
-      <div className="mt-5 grid gap-3 sm:grid-cols-2">
-        <SummaryPill label="Date" value={eventDate || "Choose date"} />
-        <SummaryPill label="Time" value={`${startTime} - ${endTime}`} />
-        <SummaryPill label="Guests" value={guestCount.toLocaleString()} />
-        <SummaryPill label="Location" value={eventLocationLabel} />
-        <SummaryPill label="Services" value={serviceSummary} />
-        <SummaryPill label="Nearby" value={`${providerCount} within range`} />
-      </div>
-
-      {initialNotes ? (
-        <p className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-neutral-700 shadow-[inset_0_0_0_1px_rgba(229,229,229,1)]">
-          Added details: {initialNotes}
-        </p>
-      ) : null}
-
-      <div className="mt-5 rounded-3xl border border-neutral-200 bg-white p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-neutral-950">
-              Anchor the map
-            </p>
-            <p className="mt-1 text-xs leading-5 text-neutral-500">
-              Use a home or event address to keep provider distance realistic.
-            </p>
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <div className="flex min-w-0 max-w-full gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+            <SummaryPill label="Date" value={eventDate || "Choose date"} />
+            <SummaryPill label="Time" value={`${startTime} - ${endTime}`} />
+            <SummaryPill label="Guests" value={guestCount.toLocaleString()} />
+            <SummaryPill label="Location" value={eventLocationLabel} />
+            <SummaryPill label="Services" value={serviceSummary} />
+            <SummaryPill label="Nearby" value={`${providerCount} close`} />
           </div>
           <button
             type="button"
             onClick={onToggleHomeVenue}
-            className={`rounded-full px-4 py-2 text-sm font-semibold transition hover:-translate-y-0.5 ${
+            className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition hover:-translate-y-0.5 ${
               useHomeVenue
                 ? "bg-neutral-950 text-white"
                 : "border border-neutral-300 bg-white text-neutral-800"
@@ -958,17 +936,39 @@ function EventContextPanel({
           >
             {useHomeVenue ? "Using address" : "Use address"}
           </button>
+          <button
+            type="button"
+            onClick={onOpenFilters}
+            className="shrink-0 rounded-full border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-950 transition hover:-translate-y-0.5 hover:border-neutral-950"
+          >
+            Refine
+          </button>
         </div>
-        {useHomeVenue ? (
-          <div className="mt-4 grid gap-3">
+      </div>
+
+      {initialNotes ? (
+        <p className="mt-3 rounded-2xl bg-[#f7f7f5] px-4 py-2 text-sm font-semibold text-neutral-700">
+          Added details: {initialNotes}
+        </p>
+      ) : null}
+
+      {useHomeVenue ? (
+          <div className="mt-3 grid gap-3 rounded-2xl border border-neutral-200 bg-[#fbfbfa] p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
             <input
               value={homeAddress}
               onChange={(event) => onHomeAddressChange(event.target.value)}
               placeholder="Home or event address"
               className="h-11 rounded-2xl border border-neutral-300 px-3 text-sm font-semibold text-neutral-900 outline-none focus:border-neutral-950"
             />
+            <button
+              type="button"
+              onClick={onUseCurrentLocation}
+              className="h-11 rounded-full bg-neutral-950 px-4 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-neutral-800"
+            >
+              Use current location
+            </button>
             {isSearchingAddress || addressSuggestions.length ? (
-              <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-[#fbfbfa]">
+              <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white sm:col-span-2">
                 {isSearchingAddress ? (
                   <p className="px-4 py-3 text-xs font-semibold text-neutral-500">
                     Searching nearby matches...
@@ -996,19 +996,13 @@ function EventContextPanel({
                 ))}
               </div>
             ) : null}
-            <button
-              type="button"
-              onClick={onUseCurrentLocation}
-              className="h-11 rounded-full bg-neutral-950 px-4 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-neutral-800"
-            >
-              Use current location
-            </button>
             {locationStatus ? (
-              <p className="text-xs font-semibold text-neutral-600">{locationStatus}</p>
+              <p className="text-xs font-semibold text-neutral-600 sm:col-span-2">
+                {locationStatus}
+              </p>
             ) : null}
           </div>
         ) : null}
-      </div>
     </section>
   );
 }
@@ -1029,11 +1023,11 @@ function getSuggestionLabel(suggestion: AddressSuggestion) {
 
 function SummaryPill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-[#f7f7f5] px-4 py-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-neutral-400">
+    <div className="min-w-fit rounded-full bg-[#f7f7f5] px-3 py-2">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
         {label}
       </p>
-      <p className="mt-1 truncate text-sm font-semibold text-neutral-800">{value}</p>
+      <p className="truncate text-xs font-semibold text-neutral-800">{value}</p>
     </div>
   );
 }

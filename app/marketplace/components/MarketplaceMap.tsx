@@ -282,7 +282,7 @@ export function MarketplaceMap({
   return (
     <section
       className={`overflow-hidden rounded-[34px] border border-neutral-200 bg-[#e9eee8] shadow-[0_28px_90px_rgba(20,20,20,0.14)] ${
-        isSticky ? "sticky top-24" : "relative"
+        isSticky ? "" : "relative"
       }`}
     >
       <div className="flex items-center justify-between gap-3 border-b border-white/70 bg-white/85 px-5 py-4 backdrop-blur">
@@ -302,7 +302,7 @@ export function MarketplaceMap({
         className={`relative overflow-hidden ${
           isSheet
             ? "h-[68vh] min-h-[420px]"
-            : "h-[calc(100vh-15rem)] min-h-[500px]"
+            : "h-[calc(100vh-8.25rem)] min-h-[560px]"
         }`}
       >
         {hasInteractiveMap ? (

@@ -35,7 +35,7 @@ export function MarketplaceRow({
   }
 
   return (
-    <section className="min-w-0 rounded-[30px] border border-neutral-200 bg-white p-5 shadow-[0_18px_56px_rgba(20,20,20,0.055)] transition duration-300 ease-out">
+    <section className="min-w-0 overflow-hidden rounded-[30px] border border-neutral-200 bg-white p-5 shadow-[0_18px_56px_rgba(20,20,20,0.055)] transition duration-300 ease-out">
       <div className="flex items-end justify-between gap-4">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight text-neutral-950">
@@ -49,9 +49,14 @@ export function MarketplaceRow({
           {items.length}
         </span>
       </div>
-      <div className="mt-5 grid min-w-0 grid-cols-1 gap-x-5 gap-y-7 lg:grid-cols-2 xl:grid-cols-2">
+      <div className="mt-5 flex min-w-0 snap-x gap-5 overflow-x-auto overscroll-x-contain scroll-smooth pb-4 [scrollbar-width:thin]">
         {items.map((item, index) => (
-          <div key={`${title}-${item.id}`} id={`vendor-card-${item.id}`} data-row-id={rowId}>
+          <div
+            key={`${title}-${item.id}`}
+            id={`vendor-card-${item.id}`}
+            data-row-id={rowId}
+            className="w-[min(76vw,340px)] shrink-0 snap-start 2xl:w-[360px]"
+          >
             <VendorCard
               buttonLabel={cartedIds.includes(item.id) ? "Selected" : "Add to quote"}
               isHighlighted={hoveredItemId === item.id || activeItemId === item.id}
