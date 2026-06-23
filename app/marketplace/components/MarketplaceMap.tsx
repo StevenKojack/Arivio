@@ -82,6 +82,7 @@ export function MarketplaceMap({
   const mapRef = useRef<MapboxMap | null>(null);
   const markerRefs = useRef<mapboxgl.Marker[]>([]);
   const popupRef = useRef<mapboxgl.Popup | null>(null);
+  const viewportSignatureRef = useRef("");
   const isSheet = layout === "sheet";
   const isSticky = layout === "sticky";
   const visiblePoints = useMemo(() => {
@@ -278,18 +279,25 @@ export function MarketplaceMap({
 
     const map = mapRef.current;
     const nextBounds = toLngLatBounds(bounds);
+    const viewportSignature = `${bounds.minLat.toFixed(4)}:${bounds.maxLat.toFixed(4)}:${bounds.minLng.toFixed(4)}:${bounds.maxLng.toFixed(4)}:${visiblePoints.length}`;
+
+    if (viewportSignatureRef.current === viewportSignature) {
+      return;
+    }
+
+    viewportSignatureRef.current = viewportSignature;
 
     if (!visiblePoints.length) {
       map.easeTo({
         center: [center.lng, center.lat],
-        duration: 240,
+        duration: 0,
         zoom: 9,
       });
       return;
     }
 
     map.fitBounds(nextBounds, {
-      duration: 280,
+      duration: 120,
       maxZoom: eventCoordinates ? 12 : 10.5,
       padding: isSheet
         ? { bottom: 86, left: 36, right: 36, top: 82 }

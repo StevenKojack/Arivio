@@ -17,11 +17,13 @@ export type QuoteCartLine = {
 };
 
 type QuoteCartDrawerProps = {
-  canSaveCart: boolean;
+  canPersistCart: boolean;
   cart: QuoteCartLine[];
   cartMessage: string;
   eventSummary: string;
   getLineQuote: (line: QuoteCartLine) => number;
+  isAuthLoading: boolean;
+  isLoggedIn: boolean;
   isRequestingQuotes: boolean;
   variant?: "panel" | "compact" | "bar";
   onRemove: (lineId: number) => void;
@@ -36,11 +38,13 @@ type QuoteCartDrawerProps = {
 const timeOptions = getTimeOptions();
 
 export function QuoteCartDrawer({
-  canSaveCart,
+  canPersistCart,
   cart,
   cartMessage,
   eventSummary,
   getLineQuote,
+  isAuthLoading,
+  isLoggedIn,
   isRequestingQuotes,
   variant = "panel",
   onRemove,
@@ -72,13 +76,12 @@ export function QuoteCartDrawer({
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            {!canSaveCart ? (
-              <Link
-                href="/auth/login"
-                className="hidden rounded-full border border-neutral-200 px-3 py-2 text-xs font-semibold text-neutral-700 transition hover:-translate-y-0.5 hover:border-neutral-950 sm:inline-flex"
-              >
-                Log in to save
-              </Link>
+            {!canPersistCart ? (
+              <CartPrompt
+                compact
+                isAuthLoading={isAuthLoading}
+                isLoggedIn={isLoggedIn}
+              />
             ) : null}
             <button
               type="button"
@@ -120,13 +123,11 @@ export function QuoteCartDrawer({
         {eventSummary}
       </p>
 
-      {!canSaveCart ? (
-        <Link
-          href="/auth/login"
-          className="mt-4 block rounded-2xl border border-neutral-200 px-4 py-3 text-sm font-semibold text-neutral-700 transition hover:border-neutral-950"
-        >
-          Log in to save your quote cart.
-        </Link>
+      {!canPersistCart ? (
+        <CartPrompt
+          isAuthLoading={isAuthLoading}
+          isLoggedIn={isLoggedIn}
+        />
       ) : null}
 
       {cartMessage ? (
@@ -176,6 +177,57 @@ export function QuoteCartDrawer({
         </button>
       </div>
     </aside>
+  );
+}
+
+function CartPrompt({
+  compact = false,
+  isAuthLoading,
+  isLoggedIn,
+}: {
+  compact?: boolean;
+  isAuthLoading: boolean;
+  isLoggedIn: boolean;
+}) {
+  if (isAuthLoading) {
+    return (
+      <p
+        className={
+          compact
+            ? "hidden rounded-full border border-neutral-200 px-3 py-2 text-xs font-semibold text-neutral-600 sm:inline-flex"
+            : "mt-4 rounded-2xl border border-neutral-200 px-4 py-3 text-sm font-semibold text-neutral-600"
+        }
+      >
+        Checking account...
+      </p>
+    );
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <Link
+        href="/auth/login"
+        className={
+          compact
+            ? "hidden rounded-full border border-neutral-200 px-3 py-2 text-xs font-semibold text-neutral-700 transition hover:-translate-y-0.5 hover:border-neutral-950 sm:inline-flex"
+            : "mt-4 block rounded-2xl border border-neutral-200 px-4 py-3 text-sm font-semibold text-neutral-700 transition hover:border-neutral-950"
+        }
+      >
+        {compact ? "Log in to save" : "Log in to save your quote cart."}
+      </Link>
+    );
+  }
+
+  return (
+    <p
+      className={
+        compact
+          ? "hidden rounded-full border border-neutral-200 px-3 py-2 text-xs font-semibold text-neutral-600 sm:inline-flex"
+          : "mt-4 rounded-2xl border border-neutral-200 px-4 py-3 text-sm font-semibold text-neutral-600"
+      }
+    >
+      {compact ? "Save event to sync" : "Save this event to sync your quote cart."}
+    </p>
   );
 }
 

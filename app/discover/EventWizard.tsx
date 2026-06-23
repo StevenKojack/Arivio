@@ -14,6 +14,11 @@ import {
   recognizeEventIntent,
   searchEventIntents,
 } from "@/lib/event-intelligence/search";
+import {
+  derivePlanningContext,
+  getContextDetails,
+  getContextServices,
+} from "@/lib/event-intelligence/context";
 import { AddressAutocomplete, type AddressSuggestion } from "./components/AddressAutocomplete";
 import { CalendarPicker } from "./components/CalendarPicker";
 import { ServiceRecommendationCard } from "./components/ServiceRecommendationCard";
@@ -28,7 +33,15 @@ type LocationKind =
 type LocationMode = "has_venue" | "needs_venue";
 
 type EventLocation = {
-  context: "likely_home" | "likely_venue" | "venue_needed" | "";
+  context:
+    | "activity_venue"
+    | "banquet_hall"
+    | "business"
+    | "church"
+    | "likely_home"
+    | "likely_venue"
+    | "venue_needed"
+    | "";
   coordinates?: {
     lat: number;
     lng: number;
@@ -92,6 +105,26 @@ const mockVenuePins = [
     coordinates: { lat: 34.1046, lng: -118.3427 },
     position: { x: 64, y: 30 },
   },
+  {
+    address: "13943 Balboa Blvd, Sylmar, CA 91342",
+    capacity: "Racing parties and groups",
+    id: "mb2-raceway",
+    label: "MB2 Raceway Sylmar",
+    match: "Teen-friendly activity venue",
+    neighborhood: "Sylmar",
+    coordinates: { lat: 34.3203, lng: -118.4992 },
+    position: { x: 24, y: 24 },
+  },
+  {
+    address: "606 Hawaii St, El Segundo, CA 90245",
+    capacity: "Private kids party venue",
+    id: "scooters-jungle",
+    label: "Scooter's Jungle El Segundo",
+    match: "Kids activity party venue",
+    neighborhood: "El Segundo",
+    coordinates: { lat: 33.9236, lng: -118.3948 },
+    position: { x: 38, y: 76 },
+  },
 ];
 
 export function EventWizard() {
@@ -131,8 +164,33 @@ export function EventWizard() {
     () => recognizeEventIntent(query || "Private party"),
     [query],
   );
+  const planningNotes = useMemo(
+    () =>
+      [
+        ...planAdditions.map((addition) => addition.label),
+        customNote.trim(),
+      ]
+        .filter(Boolean)
+        .join(", "),
+    [customNote, planAdditions],
+  );
+  const planningContext = useMemo(
+    () =>
+      derivePlanningContext({
+        budget,
+        eventLabel: query,
+        locationContext: locations[0]?.context,
+        locationText: getLocationSummary(locations),
+        notes: planningNotes,
+      }),
+    [budget, locations, planningNotes, query],
+  );
   const suggestions = useMemo(() => searchEventIntents(query, 5), [query]);
-  const visibleServices = selectedServices.filter(
+  const contextualServices = useMemo(
+    () => getContextServices(planningContext),
+    [planningContext],
+  );
+  const visibleServices = mergeServices(selectedServices, contextualServices).filter(
     (service) => !recognition.excludedServices.includes(service),
   );
   const locationSummary = getLocationSummary(locations);
@@ -151,8 +209,8 @@ export function EventWizard() {
       time: timing.startTime,
     });
 
-    if (planAdditions.length) {
-      params.set("notes", planAdditions.map((addition) => addition.label).join(", "));
+    if (planningNotes) {
+      params.set("notes", planningNotes);
     }
 
     if (eventAnchor) {
@@ -169,7 +227,7 @@ export function EventWizard() {
     guestCount,
     locationSummary,
     locations,
-    planAdditions,
+    planningNotes,
     recognition.profile,
     timing.date,
     timing.startTime,
@@ -314,6 +372,7 @@ export function EventWizard() {
               <UnderstandingCard
                 additions={planAdditions}
                 customNote={customNote}
+                planningContext={planningContext}
                 recognition={recognition}
                 selectedServices={selectedServices}
                 onAddCustomNote={addCustomNoteToPlan}
@@ -410,6 +469,7 @@ export function EventWizard() {
                   recognition.profile.subtype ??
                   recognition.profile.primaryType
                 }
+                planningContext={planningContext}
                 location={locations[0]}
                 onSelectAddress={(suggestion) =>
                   updateLocation(locations[0].id, {
@@ -659,6 +719,7 @@ function UnderstandingCard({
   onCustomNoteChange,
   onRemoveAddition,
   onToggleService,
+  planningContext,
   recognition,
   selectedServices,
 }: {
@@ -669,6 +730,7 @@ function UnderstandingCard({
   onCustomNoteChange: (value: string) => void;
   onRemoveAddition: (addition: PlanAddition) => void;
   onToggleService: (service: ServiceName) => void;
+  planningContext: ReturnType<typeof derivePlanningContext>;
   recognition: ReturnType<typeof recognizeEventIntent>;
   selectedServices: ServiceName[];
 }) {
@@ -685,6 +747,7 @@ function UnderstandingCard({
       (!serviceSearch ||
         service.toLowerCase().includes(serviceSearch.trim().toLowerCase())),
   );
+  const contextDetails = getContextDetails(planningContext);
 
   return (
     <div className="space-y-5">
@@ -698,12 +761,13 @@ function UnderstandingCard({
         <p className="mt-3 text-base leading-7 text-neutral-600">
           {getConfirmationBody(recognition)}
         </p>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <PlainDetail label="Style" value={profile.culture ?? profile.likelyVibe ?? "Flexible"} />
-          <PlainDetail label="Setting" value={profile.indoorOutdoor} />
-          <PlainDetail label="Vibe" value={profile.likelyVibe ?? "Guided"} />
-          <PlainDetail label="Guests" value={profile.likelyGuestType ?? "Your guests"} />
-        </div>
+        {contextDetails.length ? (
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            {contextDetails.map(([label, value]) => (
+              <PlainDetail key={label} label={label} value={value} />
+            ))}
+          </div>
+        ) : null}
       </div>
 
       <div className="rounded-[30px] border border-neutral-200 p-5">
@@ -767,7 +831,7 @@ function UnderstandingCard({
             <input
               value={customNote}
               onChange={(event) => onCustomNoteChange(event.target.value)}
-              placeholder="Add culture, traditions, food preferences, accessibility needs, or specific vendors."
+              placeholder="Tell us anything that matters: age, culture, food style, activities, guests, vibe, traditions..."
               className="h-12 flex-1 rounded-2xl border border-neutral-300 bg-white px-4 text-sm font-semibold outline-none transition focus:border-neutral-950"
             />
             <button
@@ -806,6 +870,7 @@ function LocationStep({
   onSelectMode,
   onSelectVenue,
   onUpdate,
+  planningContext,
 }: {
   eventLabel: string;
   location: EventLocation;
@@ -813,7 +878,12 @@ function LocationStep({
   onSelectMode: (mode: LocationMode) => void;
   onSelectVenue: (venue: (typeof mockVenuePins)[number]) => void;
   onUpdate: (updates: Partial<EventLocation>) => void;
+  planningContext: ReturnType<typeof derivePlanningContext>;
 }) {
+  const recommendedVenuePins = useMemo(
+    () => getRecommendedVenuePins(planningContext),
+    [planningContext],
+  );
   const selectedVenue = mockVenuePins.find((venue) => venue.id === location.selectedVenueId);
   const [locationMessage, setLocationMessage] = useState("");
 
@@ -955,7 +1025,7 @@ function LocationStep({
                 </p>
               ) : null}
               <div className="mt-5 space-y-2">
-                {mockVenuePins.map((venue) => (
+                {recommendedVenuePins.map((venue) => (
                   <button
                     key={venue.id}
                     type="button"
@@ -981,6 +1051,7 @@ function LocationStep({
               </div>
             </div>
             <VenueDiscoveryMap
+              pins={recommendedVenuePins}
               selectedVenueId={location.selectedVenueId}
               onSelectVenue={onSelectVenue}
             />
@@ -1053,7 +1124,7 @@ function LocationSignal({
   context: EventLocation["context"];
   label: string;
 }) {
-  const isVenue = context === "likely_venue";
+  const isVenue = context !== "likely_home";
 
   return (
     <div className="mt-4 rounded-2xl border border-neutral-200 bg-[#fbfbfa] px-4 py-3">
@@ -1061,7 +1132,7 @@ function LocationSignal({
         Address recognition
       </p>
       <p className="mt-1 text-sm font-semibold text-neutral-900">
-        {isVenue ? "Likely venue" : "Likely home/private address"}
+        {getLocationContextLabel(context)}
       </p>
       <p className="mt-1 text-sm leading-6 text-neutral-600">
         {isVenue
@@ -1074,8 +1145,10 @@ function LocationSignal({
 
 function VenueDiscoveryMap({
   onSelectVenue,
+  pins,
   selectedVenueId,
 }: {
+  pins: typeof mockVenuePins;
   onSelectVenue: (venue: (typeof mockVenuePins)[number]) => void;
   selectedVenueId?: string;
 }) {
@@ -1094,7 +1167,7 @@ function VenueDiscoveryMap({
           contracts so Google Maps or Mapbox can replace the mock layer next.
         </p>
       </div>
-      {mockVenuePins.map((venue) => {
+      {pins.map((venue) => {
         const isSelected = selectedVenueId === venue.id;
 
         return (
@@ -1249,6 +1322,10 @@ function PrimaryButton({
 function parsePlanAdditions(value: string): PlanAddition[] {
   const text = value.toLowerCase();
   const additions: PlanAddition[] = [];
+  const context = derivePlanningContext({
+    eventLabel: text,
+    notes: text,
+  });
   const cultures = [
     "armenian",
     "mexican",
@@ -1279,6 +1356,19 @@ function parsePlanAdditions(value: string): PlanAddition[] {
   addServiceMatch(additions, text, ["photo booth", "photobooth"], "Photo Booth", "Photo Booth");
   addServiceMatch(additions, text, ["flowers", "florals"], "Florals", "Florals");
   addServiceMatch(additions, text, ["cake", "dessert"], "Cake & Desserts", "Cake & Desserts");
+  addServiceMatch(additions, text, ["bounce house", "bounce houses", "inflatable"], "Bounce houses", "Bounce Houses");
+  addServiceMatch(additions, text, ["party bus", "limo", "transportation", "shuttle"], "Transportation", "Transportation");
+  addServiceMatch(additions, text, ["tables", "chairs", "tent", "shade", "rentals"], "Rentals", "Rentals");
+  addServiceMatch(additions, text, ["cleanup", "cleaning"], "Cleaning", "Cleaning");
+
+  getContextServices(context).forEach((service) => {
+    additions.push({
+      id: `service-${normalizeId(service)}`,
+      kind: "Service",
+      label: service,
+      service,
+    });
+  });
 
   if (text.includes("banquet hall")) {
     additions.push({
@@ -1331,6 +1421,80 @@ function mergeAdditions(current: PlanAddition[], incoming: PlanAddition[]) {
   });
 
   return additions;
+}
+
+function mergeServices(
+  current: ServiceName[],
+  incoming: ServiceName[],
+) {
+  return Array.from(new Set([...current, ...incoming]));
+}
+
+function getRecommendedVenuePins(
+  context: ReturnType<typeof derivePlanningContext>,
+) {
+  const scoredPins = mockVenuePins
+    .map((venue) => ({
+      score: scoreVenuePin(venue, context),
+      venue,
+    }))
+    .sort((left, right) => right.score - left.score);
+
+  return scoredPins.map(({ venue }) => venue);
+}
+
+function scoreVenuePin(
+  venue: (typeof mockVenuePins)[number],
+  context: ReturnType<typeof derivePlanningContext>,
+) {
+  const text = `${venue.label} ${venue.match} ${venue.capacity}`.toLowerCase();
+  let score = 0;
+
+  if (context.activityFocused && /raceway|jungle|activity|kids|teen|play|racing/.test(text)) {
+    score += 40;
+  }
+
+  if (context.lifeStage === "teen" && /raceway|teen|activity|racing/.test(text)) {
+    score += 32;
+  }
+
+  if (context.lifeStage === "kids" && /jungle|kids|play/.test(text)) {
+    score += 32;
+  }
+
+  if (context.lifeStage === "teen" && /auditorium|expo|club|ballroom|elegant/.test(text)) {
+    score -= 30;
+  }
+
+  if (context.homeEvent) {
+    score -= 18;
+  }
+
+  return score;
+}
+
+function getLocationContextLabel(context: EventLocation["context"]) {
+  if (context === "activity_venue") {
+    return "Likely activity venue";
+  }
+
+  if (context === "banquet_hall") {
+    return "Likely banquet hall";
+  }
+
+  if (context === "church") {
+    return "Likely church or religious venue";
+  }
+
+  if (context === "business") {
+    return "Likely business or venue";
+  }
+
+  if (context === "likely_venue") {
+    return "Likely venue";
+  }
+
+  return "Likely home/private address";
 }
 
 function getLocationSummary(locations: EventLocation[]) {

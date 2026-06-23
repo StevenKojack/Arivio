@@ -12,12 +12,15 @@ import {
 } from "@/lib/repositories/vendorsRepository";
 import type { PricingType } from "@/lib/types/domain";
 import { optionalUrl, requirePositiveNumber, requireString } from "@/lib/validators/forms";
+import { validateVendorTags } from "@/lib/validators/tags";
+
+const lifeStageOptions = ["Kids", "Teen", "Adult", "All ages"];
 
 export function VendorOnboardingForm() {
   const router = useRouter();
   const [businessName, setBusinessName] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("DJ");
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(["DJ"]);
   const [city, setCity] = useState("Los Angeles");
   const [radius, setRadius] = useState(30);
   const [websiteUrl, setWebsiteUrl] = useState("");
@@ -27,6 +30,11 @@ export function VendorOnboardingForm() {
   const [basePrice, setBasePrice] = useState(300);
   const [hourlyRate, setHourlyRate] = useState(100);
   const [minimumHours, setMinimumHours] = useState(3);
+  const [minimumGuests, setMinimumGuests] = useState(1);
+  const [maximumGuests, setMaximumGuests] = useState(150);
+  const [travelMode, setTravelMode] = useState("Travels to the customer");
+  const [selectedLifeStages, setSelectedLifeStages] = useState<string[]>(["All ages"]);
+  const [tagInput, setTagInput] = useState("birthday, private party, dance");
   const [selectedEventTypes, setSelectedEventTypes] = useState<string[]>([
     "Birthday",
     "Wedding",
@@ -61,6 +69,35 @@ export function VendorOnboardingForm() {
     );
   }
 
+  function toggleCategory(service: string) {
+    setSelectedCategories((current) => {
+      const next = current.includes(service)
+        ? current.filter((item) => item !== service)
+        : [...current, service];
+
+      return next.length ? next : current;
+    });
+
+    if (!serviceName || serviceName === `${selectedCategories[0]} package`) {
+      setServiceName(`${service} package`);
+    }
+  }
+
+  function toggleLifeStage(lifeStage: string) {
+    setSelectedLifeStages((current) => {
+      if (lifeStage === "All ages") {
+        return ["All ages"];
+      }
+
+      const withoutAllAges = current.filter((item) => item !== "All ages");
+      const next = withoutAllAges.includes(lifeStage)
+        ? withoutAllAges.filter((item) => item !== lifeStage)
+        : [...withoutAllAges, lifeStage];
+
+      return next.length ? next : ["All ages"];
+    });
+  }
+
   async function submitVendor(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -86,12 +123,23 @@ export function VendorOnboardingForm() {
       requireString(businessName, "Business name");
       requireString(serviceName, "Service name");
       requirePositiveNumber(radius, "Service radius");
+      const primaryCategory = selectedCategories[0];
+      const tags = validateVendorTags(tagInput.split(","));
+      const structuredDescription = buildStructuredVendorDescription({
+        categories: selectedCategories,
+        description,
+        lifeStages: selectedLifeStages,
+        maximumGuests,
+        minimumGuests,
+        tags,
+        travelMode,
+      });
       const vendor = await createVendorBusiness(supabase, {
         approvalStatus: "approved",
         businessName,
-        category,
+        category: selectedCategories.join(", "),
         city,
-        description: description || null,
+        description: structuredDescription,
         ownerId: profile.id,
         phone: phone || null,
         radius,
@@ -100,8 +148,8 @@ export function VendorOnboardingForm() {
 
       await createVendorService(supabase, {
         basePrice: pricingType === "hourly" ? null : basePrice,
-        category,
-        description: description || null,
+        category: primaryCategory,
+        description: structuredDescription,
         eventTypesSupported: selectedEventTypes,
         hourlyRate: pricingType === "hourly" ? hourlyRate : null,
         minimumHours: pricingType === "hourly" ? minimumHours : null,
@@ -139,19 +187,23 @@ export function VendorOnboardingForm() {
           />
         </label>
         <label className="grid gap-2 text-sm font-semibold text-neutral-800">
-          Category
-          <select
-            value={category}
-            onChange={(event) => {
-              setCategory(event.target.value);
-              setServiceName(`${event.target.value} package`);
-            }}
-            className="h-12 rounded-lg border border-neutral-300 bg-white px-4 text-sm outline-none focus:border-neutral-950"
-          >
-            {allServices.map((service) => (
-              <option key={service}>{service}</option>
+          Primary categories
+          <span className="grid max-h-40 gap-2 overflow-y-auto rounded-lg border border-neutral-200 bg-[#fbfbfa] p-2">
+            {allServices.slice(0, 18).map((service) => (
+              <button
+                key={service}
+                type="button"
+                onClick={() => toggleCategory(service)}
+                className={`rounded-full px-3 py-2 text-left text-xs font-semibold transition ${
+                  selectedCategories.includes(service)
+                    ? "bg-neutral-950 text-white"
+                    : "border border-neutral-300 bg-white text-neutral-700"
+                }`}
+              >
+                {service}
+              </button>
             ))}
-          </select>
+          </span>
         </label>
         <label className="grid gap-2 text-sm font-semibold text-neutral-800 md:col-span-2">
           Description
@@ -256,6 +308,38 @@ export function VendorOnboardingForm() {
               />
             </label>
           )}
+          <label className="grid gap-2 text-sm font-semibold text-neutral-800">
+            Minimum guests
+            <input
+              type="number"
+              min="1"
+              value={minimumGuests}
+              onChange={(event) => setMinimumGuests(Number(event.target.value))}
+              className="h-12 rounded-lg border border-neutral-300 px-4 text-sm outline-none focus:border-neutral-950"
+            />
+          </label>
+          <label className="grid gap-2 text-sm font-semibold text-neutral-800">
+            Maximum guests
+            <input
+              type="number"
+              min="1"
+              value={maximumGuests}
+              onChange={(event) => setMaximumGuests(Number(event.target.value))}
+              className="h-12 rounded-lg border border-neutral-300 px-4 text-sm outline-none focus:border-neutral-950"
+            />
+          </label>
+          <label className="grid gap-2 text-sm font-semibold text-neutral-800 md:col-span-2">
+            Travel behavior
+            <select
+              value={travelMode}
+              onChange={(event) => setTravelMode(event.target.value)}
+              className="h-12 rounded-lg border border-neutral-300 bg-white px-4 text-sm outline-none focus:border-neutral-950"
+            >
+              <option>Travels to the customer</option>
+              <option>Customer comes to our location</option>
+              <option>Both travel and on-site service</option>
+            </select>
+          </label>
         </div>
         <fieldset className="mt-5">
           <legend className="text-sm font-semibold text-neutral-800">
@@ -278,6 +362,39 @@ export function VendorOnboardingForm() {
             ))}
           </div>
         </fieldset>
+        <fieldset className="mt-5">
+          <legend className="text-sm font-semibold text-neutral-800">
+            Ages or life stages supported
+          </legend>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {lifeStageOptions.map((lifeStage) => (
+              <button
+                key={lifeStage}
+                type="button"
+                onClick={() => toggleLifeStage(lifeStage)}
+                className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
+                  selectedLifeStages.includes(lifeStage)
+                    ? "bg-neutral-950 text-white"
+                    : "border border-neutral-300 bg-white text-neutral-700"
+                }`}
+              >
+                {lifeStage}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+        <label className="mt-5 grid gap-2 text-sm font-semibold text-neutral-800">
+          Service tags
+          <input
+            value={tagInput}
+            onChange={(event) => setTagInput(event.target.value)}
+            placeholder="teen, activity, backyard, armenian, taco-cart"
+            className="h-12 rounded-lg border border-neutral-300 bg-white px-4 text-sm outline-none focus:border-neutral-950"
+          />
+          <span className="text-xs font-medium text-neutral-500">
+            Use short comma-separated tags. Offensive tags are blocked.
+          </span>
+        </label>
       </div>
 
       {error ? (
@@ -304,4 +421,25 @@ export function VendorOnboardingForm() {
       </button>
     </form>
   );
+}
+
+function buildStructuredVendorDescription(input: {
+  categories: string[];
+  description: string;
+  lifeStages: string[];
+  maximumGuests: number;
+  minimumGuests: number;
+  tags: string[];
+  travelMode: string;
+}) {
+  return [
+    input.description.trim(),
+    `Categories: ${input.categories.join(", ")}`,
+    `Travel: ${input.travelMode}`,
+    `Guest range: ${input.minimumGuests}-${input.maximumGuests}`,
+    `Life stages: ${input.lifeStages.join(", ")}`,
+    `Tags: ${input.tags.join(", ")}`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }

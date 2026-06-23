@@ -1,6 +1,7 @@
 "use client";
 
 import { memo } from "react";
+import Image from "next/image";
 import type { MarketplaceItem } from "@/app/data/marketplace";
 import { getVendorImage } from "@/lib/marketplace/vendorImages";
 
@@ -60,9 +61,14 @@ function VendorCardComponent({
       }`}
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-[#f2f0ec]">
-        <div
-          className="h-full bg-cover bg-center transition duration-500 hover:scale-105"
-          style={{ backgroundImage: `url(${imageUrl})` }}
+        <Image
+          src={imageUrl}
+          alt=""
+          fill
+          loading="lazy"
+          sizes="(max-width: 768px) 74vw, 326px"
+          unoptimized
+          className="object-cover transition duration-500 hover:scale-105"
         />
         <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_38%,rgba(0,0,0,0.55))]" />
         <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between gap-3">

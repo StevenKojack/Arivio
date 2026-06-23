@@ -77,6 +77,7 @@ export type MarketplaceServiceOption = {
   estimateLabel: string;
   priceAdjustment?: number;
   service: ServiceName;
+  serviceId?: string | null;
   title: string;
 };
 

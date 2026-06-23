@@ -8,7 +8,13 @@ import {
 
 export type AddressSuggestion = GeocodingSuggestion & {
   address: string;
-  context: "likely_home" | "likely_venue";
+  context:
+    | "activity_venue"
+    | "banquet_hall"
+    | "business"
+    | "church"
+    | "likely_home"
+    | "likely_venue";
   neighborhood: string;
 };
 
@@ -131,7 +137,29 @@ function normalizeSuggestion(suggestion: GeocodingSuggestion): AddressSuggestion
   return {
     ...suggestion,
     address: suggestion.label,
-    context: suggestion.placeType === "venue" ? "likely_venue" : "likely_home",
+    context: getAddressContext(suggestion),
     neighborhood: suggestion.label.split(",").at(-2)?.trim() ?? suggestion.label,
   };
+}
+
+function getAddressContext(suggestion: GeocodingSuggestion): AddressSuggestion["context"] {
+  const label = suggestion.label.toLowerCase();
+
+  if (/\b(church|cathedral|temple|mosque|synagogue|chapel)\b/.test(label)) {
+    return "church";
+  }
+
+  if (/\b(banquet|ballroom|hall|reception|events?|venue)\b/.test(label)) {
+    return "banquet_hall";
+  }
+
+  if (/\b(raceway|arcade|bowling|trampoline|laser tag|escape room|play|jungle)\b/.test(label)) {
+    return "activity_venue";
+  }
+
+  if (suggestion.placeType === "venue") {
+    return "business";
+  }
+
+  return "likely_home";
 }

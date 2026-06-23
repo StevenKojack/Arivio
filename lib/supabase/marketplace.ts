@@ -120,6 +120,7 @@ export async function getMarketplaceProviders(supabase: TypedSupabaseClient) {
           ...(tagsByVendor.get(vendor.id) ?? []),
           ...(tagsByService.get(service.id) ?? []),
         ],
+        services.filter((candidate) => candidate.vendor_id === vendor.id),
         index,
       );
     })
@@ -276,9 +277,19 @@ function mapServiceToMarketplaceItem(
   availability: VendorAvailabilityRow[],
   photos: VendorPhotoRow[],
   tags: string[],
+  vendorServices: VendorServiceRow[],
   index: number,
 ): MarketplaceItem {
   const type = toServiceName(service.category);
+  const serviceOptions = vendorServices.map((vendorService) => ({
+    description:
+      vendorService.description ??
+      `${vendor.business_name} offers ${vendorService.service_name}.`,
+    estimateLabel: priceLabel(toPricingModel(vendorService)),
+    service: toServiceName(vendorService.category),
+    serviceId: vendorService.id,
+    title: vendorService.service_name,
+  }));
   const events = service.event_types_supported
     .filter((eventType): eventType is EventType =>
       eventTypes.includes(eventType as EventType),
@@ -313,7 +324,8 @@ function mapServiceToMarketplaceItem(
     reviewCount: 1,
     serviceId: service.id,
     serviceRadiusMiles: vendor.service_radius_miles,
-    services: [type],
+    serviceOptions: serviceOptions.length > 1 ? serviceOptions : undefined,
+    services: Array.from(new Set(vendorServices.map((vendorService) => toServiceName(vendorService.category)))),
     sourceLabel: vendor.website_url ? "Vendor website" : "Database vendor",
     sourceUrl: vendor.website_url ?? "#",
     tags: Array.from(new Set([...tags, service.category, vendor.category, city])),

@@ -32,6 +32,12 @@ import { getProfileByMarketplaceType } from "@/lib/event-intelligence/taxonomy";
 import { recognizeEventIntent } from "@/lib/event-intelligence/search";
 import { rankMarketplaceItems } from "@/lib/event-intelligence/recommendations";
 import {
+  derivePlanningContext,
+  isMarketplaceItemCompatible,
+  scoreMarketplaceContext,
+  type EventPlanningContext,
+} from "@/lib/event-intelligence/context";
+import {
   createCartItem,
   updateCartItemTime,
 } from "@/lib/repositories/cartRepository";
@@ -102,6 +108,7 @@ export function MarketplaceBrowser() {
   const initialBudget = searchParams.get("budget");
   const initialLocation = searchParams.get("location") ?? "";
   const initialNotes = searchParams.get("notes") ?? "";
+  const initialLocationContext = searchParams.get("locationContext") ?? "";
   const initialRecommendedServices =
     initialEventType === "All" ? [] : eventPlanPresets[initialEventType].recommended;
   const [providers, setProviders] = useState<MarketplaceItem[]>(demoItems);
@@ -109,6 +116,8 @@ export function MarketplaceBrowser() {
     "Loading marketplace providers...",
   );
   const [profile, setProfile] = useState<ProfileRow | null>(null);
+  const [sessionUserId, setSessionUserId] = useState<string | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(hasSupabaseConfig());
   const [savedEvent, setSavedEvent] = useState<EventRow | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<EventType | "All">(
     initialEventType,
@@ -141,6 +150,7 @@ export function MarketplaceBrowser() {
   const [activeRowId, setActiveRowId] = useState("best-matches");
   const [hoveredItemId, setHoveredItemId] = useState<number | null>(null);
   const hoverFrameRef = useRef<number | null>(null);
+  const activeRowFrameRef = useRef<number | null>(null);
   const [isMobileMapOpen, setIsMobileMapOpen] = useState(false);
   const [pendingServiceItem, setPendingServiceItem] = useState<MarketplaceItem | null>(null);
   const [selectedMapItemId, setSelectedMapItemId] = useState<number | null>(null);
@@ -218,6 +228,25 @@ export function MarketplaceBrowser() {
     ? selectedServices.slice(0, 4).join(", ")
     : "Open to suggestions";
   const normalizedQuery = query.trim().toLowerCase();
+  const planningContext = useMemo(
+    () =>
+      derivePlanningContext({
+        budget: initialBudget,
+        eventLabel: selectedEvent === "All" ? initialEvent : selectedEvent,
+        locationContext: initialLocationContext,
+        locationText: `${initialLocation} ${homeAddress}`,
+        notes: initialNotes,
+      }),
+    [
+      homeAddress,
+      initialBudget,
+      initialEvent,
+      initialLocation,
+      initialLocationContext,
+      initialNotes,
+      selectedEvent,
+    ],
+  );
   const filteredItems = useMemo(() => {
     const nextItems = providers.filter((item) => {
       const matchesEvent =
@@ -266,12 +295,13 @@ export function MarketplaceBrowser() {
         matchesCity &&
         withinRadius &&
         isNearEnough &&
-        matchesAvailability
+        matchesAvailability &&
+        isMarketplaceItemCompatible(item, planningContext)
       );
     });
 
     if (selectedEvent === "All") {
-      return nextItems;
+      return rankByPlanningContext(nextItems, planningContext);
     }
 
     const profile = getProfileByMarketplaceType(selectedEvent);
@@ -284,7 +314,10 @@ export function MarketplaceBrowser() {
       },
     );
 
-    return rankedItems.map((rankedItem) => rankedItem.item);
+    return rankByPlanningContext(
+      rankedItems.map((rankedItem) => rankedItem.item),
+      planningContext,
+    );
   }, [
     endTime,
     eventCoordinates,
@@ -292,13 +325,15 @@ export function MarketplaceBrowser() {
     globalQuoteContext,
     normalizedQuery,
     providers,
+    planningContext,
     savedEvent?.city,
     selectedEvent,
     excludedServices,
     selectedServices,
     startTime,
   ]);
-  const canSaveCart = Boolean(profile && savedEvent);
+  const isLoggedIn = Boolean(sessionUserId || profile);
+  const canPersistCart = Boolean(profile && savedEvent);
   const cartedIds = useMemo(
     () => Array.from(new Set(cart.map((line) => line.item.id))),
     [cart],
@@ -316,7 +351,10 @@ export function MarketplaceBrowser() {
     () => buildMarketplaceRows(filteredItems),
     [filteredItems],
   );
-  const activeRow = marketplaceRows.find((row) => row.id === activeRowId) ?? marketplaceRows[0];
+  const activeRow = useMemo(
+    () => marketplaceRows.find((row) => row.id === activeRowId) ?? marketplaceRows[0],
+    [activeRowId, marketplaceRows],
+  );
   const mapPins = useMemo<MarketplaceMapPin[]>(() => {
     const activeItems = activeRow?.items ?? [];
     const activeIds = new Set(activeItems.map((item) => item.id));
@@ -354,6 +392,7 @@ export function MarketplaceBrowser() {
   useEffect(() => {
     async function loadMarketplace() {
       if (!hasSupabaseConfig()) {
+        setIsAuthLoading(false);
         setProviders(demoItems());
         setMarketplaceMessage(
           "Supabase needs a real project URL. Showing demo providers until the database is connected.",
@@ -365,10 +404,13 @@ export function MarketplaceBrowser() {
         const supabase = createBrowserSupabaseClient();
         const { data: sessionData } = await supabase.auth.getSession();
         const user = sessionData.session?.user;
+        setSessionUserId(user?.id ?? null);
 
         if (user) {
           const currentProfile = await ensureCurrentProfile(supabase, user);
           setProfile(currentProfile);
+        } else {
+          setProfile(null);
         }
 
         if (eventId) {
@@ -398,12 +440,16 @@ export function MarketplaceBrowser() {
           "No approved database providers were found. Showing demo providers with clear demo labels.",
         );
       } catch (error) {
+        setSessionUserId(null);
+        setProfile(null);
         setProviders(demoItems());
         setMarketplaceMessage(
           error instanceof Error
             ? `${error.message}. Showing demo providers until Supabase data is ready.`
             : "Unable to load database providers. Showing demo providers.",
         );
+      } finally {
+        setIsAuthLoading(false);
       }
     }
 
@@ -411,6 +457,36 @@ export function MarketplaceBrowser() {
     // The initial URL params should seed the browser once when the route loads.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
+
+  useEffect(() => {
+    if (!hasSupabaseConfig()) {
+      return;
+    }
+
+    const supabase = createBrowserSupabaseClient();
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const user = session?.user ?? null;
+
+      setSessionUserId(user?.id ?? null);
+
+      if (!user) {
+        setProfile(null);
+        setIsAuthLoading(false);
+        return;
+      }
+
+      try {
+        const currentProfile = await ensureCurrentProfile(supabase, user);
+        setProfile(currentProfile);
+      } finally {
+        setIsAuthLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (!marketplaceRows.length) {
@@ -425,7 +501,13 @@ export function MarketplaceBrowser() {
         const rowId = visibleEntry?.target.getAttribute("data-marketplace-row");
 
         if (rowId) {
-          setActiveRowId((current) => (current === rowId ? current : rowId));
+          if (activeRowFrameRef.current) {
+            window.cancelAnimationFrame(activeRowFrameRef.current);
+          }
+
+          activeRowFrameRef.current = window.requestAnimationFrame(() => {
+            setActiveRowId((current) => (current === rowId ? current : rowId));
+          });
         }
       },
       {
@@ -444,6 +526,10 @@ export function MarketplaceBrowser() {
     () => () => {
       if (hoverFrameRef.current) {
         window.cancelAnimationFrame(hoverFrameRef.current);
+      }
+
+      if (activeRowFrameRef.current) {
+        window.cancelAnimationFrame(activeRowFrameRef.current);
       }
     },
     [],
@@ -614,7 +700,7 @@ export function MarketplaceBrowser() {
     setCart((current) => [...current, line]);
 
     if (!profile || !savedEvent) {
-      setCartMessage("Log in to save your quote cart.");
+      setCartMessage(getCartAuthMessage(isAuthLoading, isLoggedIn, Boolean(savedEvent)));
       return;
     }
 
@@ -640,7 +726,7 @@ export function MarketplaceBrowser() {
         estimatedPrice,
         eventId: savedEvent.id,
         itemType: serviceOption.service === "Venue" ? "venue" : "vendor_service",
-        serviceId: item.serviceId ?? null,
+        serviceId: serviceOption.serviceId ?? item.serviceId ?? null,
         startTime,
         vendorId: item.vendorId ?? null,
         venueId: item.venueId ?? null,
@@ -670,6 +756,8 @@ export function MarketplaceBrowser() {
     profile,
     savedEvent,
     startTime,
+    isAuthLoading,
+    isLoggedIn,
   ]);
 
   const addToCart = useCallback(async (item: MarketplaceItem) => {
@@ -713,11 +801,13 @@ export function MarketplaceBrowser() {
   function renderQuoteCart(variant: "panel" | "compact" | "bar" = "panel") {
     return (
       <QuoteCartDrawer
-        canSaveCart={canSaveCart}
+        canPersistCart={canPersistCart}
         cart={cart}
         cartMessage={cartMessage}
         eventSummary={`${eventDate || "Choose a date"} from ${formatTime(startTime)} to ${formatTime(endTime)}`}
         getLineQuote={getLineQuote}
+        isAuthLoading={isAuthLoading}
+        isLoggedIn={isLoggedIn}
         isRequestingQuotes={isRequestingQuotes}
         variant={variant}
         onRemove={removeFromCart}
@@ -775,7 +865,7 @@ export function MarketplaceBrowser() {
     }
 
     if (!profile || !savedEvent) {
-      setCartMessage("Log in to save your quote cart.");
+      setCartMessage(getCartAuthMessage(isAuthLoading, isLoggedIn, Boolean(savedEvent)));
       return;
     }
 
@@ -1438,12 +1528,44 @@ function buildMarketplaceRows(items: MarketplaceItem[]): MarketplaceRowGroup[] {
 function byServices(items: MarketplaceItem[], services: ServiceName[]) {
   return items.filter(
     (item) => itemMatchesServices(item, services),
-  );
+  ).slice(0, 12);
 }
 
 function itemMatchesServices(item: MarketplaceItem, services: ServiceName[]) {
   return (
     services.includes(item.type) ||
-    item.services.some((service) => services.includes(service))
+    item.services.some((service) => services.includes(service)) ||
+    Boolean(item.serviceOptions?.some((option) => services.includes(option.service)))
   );
+}
+
+function rankByPlanningContext(
+  items: MarketplaceItem[],
+  context: EventPlanningContext,
+) {
+  return [...items].sort(
+    (left, right) =>
+      scoreMarketplaceContext(right, context) -
+      scoreMarketplaceContext(left, context),
+  );
+}
+
+function getCartAuthMessage(
+  isAuthLoading: boolean,
+  isLoggedIn: boolean,
+  hasSavedEvent: boolean,
+) {
+  if (isAuthLoading) {
+    return "Checking your account before syncing this quote cart.";
+  }
+
+  if (!isLoggedIn) {
+    return "Log in to save your quote cart.";
+  }
+
+  if (!hasSavedEvent) {
+    return "Save this event before syncing cart items or requesting quotes.";
+  }
+
+  return "This quote cart is ready to save.";
 }
