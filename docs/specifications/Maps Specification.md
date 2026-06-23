@@ -4,27 +4,37 @@ Version 1.0
 
 # Table of Contents
 
-[1\. The Philosophy of Maps](#chapter-1:-the-philosophy-of-maps)	
+1\. [The Philosophy of Maps](#chapter-1:-the-philosophy-of-maps)
 
-[2\. The Lifecycle of a Map](#chapter-2:-the-lifecycle-of-a-map)
+2\. [Map Experience & Interface Standards](#chapter-2:-map-experience-&-interface-standards)	
 
-[3\. Map Intelligence](#chapter-3:-map-intelligence)
+3[. The Lifecycle of a Map](#chapter-3:-the-lifecycle-of-a-map)
 
-[4\. Marketplace Integration](#chapter-4:-marketplace-integration)
+4[. Map Intelligence](#heading=h.ypt1pm7clpsy)
 
-[5\. Map Interaction Language](#chapter-5:-map-interaction-language)
+5[. Marketplace Integration](#chapter-5:-marketplace-integration)
 
-[6\. Planner Maps](#chapter-6:-planner-maps)
+6[. Map Interaction Language](#chapter-6:-map-interaction-language)
 
-[7\. Vendor Maps & Territory Intelligence](#chapter-7:-vendor-maps-&-territory-intelligence)
+7[. Planner Maps](#chapter-7:-planner-maps)
 
-[8\. Event Flow & Spatial Timeline](#chapter-8:-event-flow-&-spatial-timeline)
+8[. Vendor Maps & Territory Intelligence](#chapter-8:-vendor-maps-&-territory-intelligence)
 
-[9\. Future Intelligence & Platform Evolution](#chapter-9:-future-intelligence-&-platform-evolution)
+9[. Event Flow & Spatial Timeline](#chapter-9:-event-flow-&-spatial-timeline)
 
-[10\. Constitutional Standards](#chapter-10:-constitutional-standards) 
+10[. Future Intelligence & Platform Evolution](#heading=h.i4ach4hfbmys)
+
+[11\. Constitutional Standards](#heading=h.k6qlal5ywg5m) 
 
 ---
+
+# 
+
+# 
+
+# 
+
+# 
 
 # **Chapter 1: The Philosophy of Maps** {#chapter-1:-the-philosophy-of-maps}
 
@@ -256,7 +266,381 @@ The following principles apply to every map within Arivio, regardless of future 
 
 • The map should help tell the story of the event, not simply display locations.
 
-# **Chapter 2: The Lifecycle of a Map** {#chapter-2:-the-lifecycle-of-a-map}
+# **Chapter 2: Map Experience & Interface Standards** {#chapter-2:-map-experience-&-interface-standards}
+
+## **Introduction**
+
+This chapter defines the physical experience of every map within Arivio.
+
+Previous chapters define why the map exists.
+
+This chapter defines how the map should feel, where it should appear, how it should behave, and how every interaction should be presented to the planner.
+
+This chapter intentionally discusses experience rather than implementation.
+
+Regardless of future technologies or mapping providers, these principles remain the source of truth.
+
+---
+
+# **Design Philosophy**
+
+The map should never feel embedded.
+
+The map should feel like a natural part of Arivio.
+
+It should never appear as a third-party widget placed onto a webpage.
+
+Instead, the surrounding interface should feel as though it was designed around the map itself.
+
+The map is one of Arivio's primary planning surfaces.
+
+It deserves visual importance equal to the Marketplace.
+
+---
+
+# **Visual Identity**
+
+Every map should feel:
+
+Calm.
+
+Premium.
+
+Modern.
+
+Responsive.
+
+Inviting.
+
+The planner should immediately trust the experience.
+
+The map should never resemble enterprise software.
+
+Nor should it resemble raw mapping software.
+
+It should feel like a carefully designed planning workspace.
+
+---
+
+# **Map Placement**
+
+Whenever a map is displayed, its placement should remain predictable.
+
+The planner should never need to search for it.
+
+Consistency builds familiarity.
+
+Every map should occupy the same logical position whenever its purpose is similar.
+
+---
+
+# **Marketplace Layout**
+
+The Marketplace represents Arivio's command center.
+
+It consists of three permanent workspaces.
+
+Vendor Discovery.
+
+Interactive Map.
+
+Quote Cart.
+
+These three areas should coexist without competing for attention.
+
+The Marketplace should never force the planner to switch between list view and map view on desktop devices.
+
+The planner should browse vendors while simultaneously understanding their geographic relationship.
+
+---
+
+## **Vendor Discovery**
+
+Vendor discovery occupies the left side of the workspace.
+
+This area scrolls vertically.
+
+Each category scrolls horizontally.
+
+Rows should resemble a curated streaming platform.
+
+The planner explores categories rather than endless lists.
+
+Cards should remain large enough for imagery to become the primary method of recognition.
+
+Photography should communicate quality before text is ever read.
+
+---
+
+## **Interactive Map**
+
+The map occupies the right side of the Marketplace.
+
+It remains visible throughout browsing.
+
+The map should never scroll away.
+
+The map should never collapse.
+
+The map should never reload while browsing vendors.
+
+Its purpose is to remain a constant geographic reference.
+
+The planner's understanding of the event should never disappear simply because they continue scrolling.
+
+---
+
+## **Quote Cart**
+
+The Quote Cart occupies its own permanent workspace.
+
+It should never cover the map.
+
+It should never obscure important interface elements.
+
+It remains visible throughout planning.
+
+The Quote Cart represents progress.
+
+It should quietly remind the planner that their event is taking shape.
+
+---
+
+# **Marketplace Interaction**
+
+Scrolling vendor rows updates the map.
+
+Selecting vendors updates the map.
+
+Filtering vendors updates the map.
+
+Removing vendors updates the map.
+
+The map should feel alive.
+
+Every interaction should produce an understandable visual response.
+
+The planner should never wonder whether the map has updated.
+
+---
+
+# **Planner Maps**
+
+Maps shown during onboarding should remain compact.
+
+They exist to build confidence.
+
+Not consume attention.
+
+When appropriate, planners may expand these maps into larger workspaces for more precise interaction.
+
+The interface should naturally encourage expansion without requiring it.
+
+---
+
+# **Vendor Maps**
+
+Vendor onboarding maps should prioritize precision.
+
+The vendor should immediately understand where their business operates.
+
+The interface should support:
+
+Business location confirmation.
+
+Territory editing.
+
+Service area drawing.
+
+Multiple operating regions.
+
+Future revisions.
+
+The experience should resemble defining a business rather than configuring software.
+
+---
+
+# **Zone Mapping**
+
+Zones define geographic intent.
+
+They are one of the most powerful tools within Arivio.
+
+Planners use zones to describe where they would like their event to occur.
+
+Vendors use zones to describe where they are willing to provide services.
+
+The Marketplace exists where these zones overlap.
+
+Zones should support:
+
+Circular search areas.
+
+Freeform polygons.
+
+Multiple independent areas.
+
+Temporary exploration.
+
+Saved planning regions.
+
+Editing should feel direct.
+
+Dragging, resizing, and redrawing should feel effortless.
+
+The planner should feel comfortable experimenting.
+
+Nothing should feel permanent until explicitly confirmed.
+
+---
+
+# **Marker Design**
+
+Markers should become one of Arivio's most recognizable visual elements.
+
+Every category should possess its own professionally illustrated icon.
+
+Icons should function as the marker itself.
+
+Examples include:
+
+Church.
+
+Banquet Hall.
+
+Hotel.
+
+Cake.
+
+Florals.
+
+Photography.
+
+DJ.
+
+Live Music.
+
+Party Bus.
+
+Security.
+
+Cleaning.
+
+Entertainment.
+
+Transportation.
+
+Valet.
+
+Rentals.
+
+The visual language should remain consistent across every service.
+
+Markers should immediately communicate purpose without requiring labels.
+
+---
+
+# **Vendor Popups**
+
+Clicking a marker opens a vendor preview.
+
+Hovering never opens a full popup.
+
+The popup should include:
+
+Photography.
+
+Business name.
+
+Primary service.
+
+Starting price.
+
+Rating.
+
+Distance.
+
+One primary action.
+
+One secondary action.
+
+The planner should never feel overwhelmed.
+
+The popup exists to encourage exploration, not replace the vendor profile.
+
+---
+
+# **Motion**
+
+Movement should always communicate change.
+
+Maps should animate smoothly.
+
+Pins should transition naturally.
+
+Selections should gently emphasize themselves.
+
+The interface should never snap abruptly.
+
+Nothing should move without purpose.
+
+The planner should perceive continuity rather than change.
+
+---
+
+# **Performance**
+
+Performance is part of the user experience.
+
+Animations should never reduce responsiveness.
+
+Scrolling should remain fluid.
+
+Map movement should remain immediate.
+
+Large datasets should never cause noticeable interface degradation.
+
+The planner should never think about performance.
+
+They should simply experience responsiveness.
+
+---
+
+# **Universal Standards**
+
+Every future map implementation must satisfy the following principles.
+
+• The map always feels integrated.
+
+• The map remains visually present whenever it provides value.
+
+• The Marketplace always consists of Vendor Discovery, Interactive Map, and Quote Cart.
+
+• Vendor browsing and geographic understanding occur simultaneously.
+
+• The map should never disappear during planning.
+
+• Every interaction should update the map naturally.
+
+• Every marker should possess a unique visual identity.
+
+• Zones should be intuitive to create and edit.
+
+• Motion should communicate understanding.
+
+• Performance is a feature.
+
+---
+
+# **Closing Statement**
+
+The Arivio Map is not simply a place where locations are displayed.
+
+It is one of the company's primary planning workspaces.
+
+Every placement decision, every animation, every interaction, and every visual element should reinforce the planner's confidence that they understand their event better than they did a moment before.
+
+# **Chapter 3: The Lifecycle of a Map** {#chapter-3:-the-lifecycle-of-a-map}
 
 ### **Introduction**
 
@@ -602,7 +986,7 @@ Greater knowledge should always produce greater clarity.
 
 Never greater complexity.
 
-# **Chapter 3: Map Intelligence** {#chapter-3:-map-intelligence}
+**Chapter 4: Map Intelligence**
 
 ## **Introduction**
 
@@ -1026,8 +1410,7 @@ The intelligence should disappear behind the experience.
 
 The greatest compliment Arivio can receive is that planning simply feels obvious.
 
-
-# **Chapter 4: Marketplace Integration** {#chapter-4:-marketplace-integration}
+# **Chapter 5: Marketplace Integration** {#chapter-5:-marketplace-integration}
 
 ## **Introduction**
 
@@ -1543,7 +1926,7 @@ The Marketplace should become calmer as planning progresses.
 
 Never busier.
 
-# **Chapter 5: Map Interaction Language** {#chapter-5:-map-interaction-language}
+# **Chapter 6: Map Interaction Language** {#chapter-6:-map-interaction-language}
 
 ## **Introduction**
 
@@ -2027,7 +2410,7 @@ When interactions become invisible, confidence becomes effortless.
 
 That is the standard every future map interaction must uphold.
 
-# **Chapter 6: Planner Maps** {#chapter-6:-planner-maps}
+# **Chapter 7: Planner Maps** {#chapter-7:-planner-maps}
 
 ## **Introduction**
 
@@ -2475,7 +2858,7 @@ The following principles apply to every planner-facing map.
 
 • Every location should make the Marketplace smarter.
 
-# **Chapter 7: Vendor Maps & Territory Intelligence** {#chapter-7:-vendor-maps-&-territory-intelligence}
+# **Chapter 8: Vendor Maps & Territory Intelligence** {#chapter-8:-vendor-maps-&-territory-intelligence}
 
 ## **Introduction**
 
@@ -3093,13 +3476,7 @@ The following principles apply to every vendor-facing map.
 
 • Maps should quietly understand vendors without requiring planners to do the work.
 
-# 
-
-# 
-
-# 
-
-# **Chapter 8: Event Flow & Spatial Timeline** {#chapter-8:-event-flow-&-spatial-timeline}
+# **Chapter 9: Event Flow & Spatial Timeline** {#chapter-9:-event-flow-&-spatial-timeline}
 
 ## **Introduction**
 
@@ -3521,7 +3898,7 @@ It is helping them visualize an event that has not happened yet.
 
 When a planner can look at the map and mentally experience the entire celebration before the first guest arrives, the map has fulfilled its purpose.
 
-# **Chapter 9: Future Intelligence & Platform Evolution** {#chapter-9:-future-intelligence-&-platform-evolution}
+**Chapter 10: Future Intelligence & Platform Evolution**
 
 ## **Introduction**
 
@@ -3971,7 +4348,7 @@ The greatest measure of success is not how many capabilities the map possesses.
 
 It is how little effort the planner feels while using it.
 
-# **Chapter 10: Constitutional Standards** {#chapter-10:-constitutional-standards}
+**Chapter 11: Constitutional Standards**
 
 ## **Introduction**
 
