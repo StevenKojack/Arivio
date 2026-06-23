@@ -19,6 +19,7 @@ type QuoteCartDrawerProps = {
   eventSummary: string;
   getLineQuote: (line: QuoteCartLine) => number;
   isRequestingQuotes: boolean;
+  variant?: "panel" | "compact";
   onRemove: (itemId: number) => void;
   onRequestQuotes: () => void;
   onUpdateTime: (
@@ -35,20 +36,28 @@ export function QuoteCartDrawer({
   eventSummary,
   getLineQuote,
   isRequestingQuotes,
+  variant = "panel",
   onRemove,
   onRequestQuotes,
   onUpdateTime,
 }: QuoteCartDrawerProps) {
   const total = cart.reduce((sum, line) => sum + getLineQuote(line), 0);
+  const isCompact = variant === "compact";
 
   return (
-    <aside className="sticky top-24 h-fit min-w-0 rounded-[28px] border border-neutral-200 bg-white p-5 shadow-[0_22px_70px_rgba(20,20,20,0.08)] transition duration-200 ease-out hover:shadow-[0_26px_82px_rgba(20,20,20,0.1)]">
+    <aside
+      className={`min-w-0 rounded-[28px] border border-neutral-200 bg-white/95 shadow-[0_22px_70px_rgba(20,20,20,0.08)] backdrop-blur transition duration-200 ease-out hover:shadow-[0_26px_82px_rgba(20,20,20,0.1)] ${
+        isCompact
+          ? "max-h-[52vh] overflow-y-auto p-4"
+          : "sticky top-24 h-fit p-5"
+      }`}
+    >
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
             Quote cart
           </p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-tight">
+          <h2 className={`${isCompact ? "mt-1 text-xl" : "mt-2 text-2xl"} font-semibold tracking-tight`}>
             {cart.length} selected
           </h2>
         </div>
@@ -76,11 +85,12 @@ export function QuoteCartDrawer({
         </p>
       ) : null}
 
-      <div className="mt-5 space-y-3">
+      <div className={`${isCompact ? "mt-4 max-h-44 overflow-y-auto pr-1" : "mt-5"} space-y-3`}>
         {cart.length ? (
-          cart.map((line) => (
-          <CartLineCard
+          (isCompact ? cart.slice(0, 3) : cart).map((line) => (
+            <CartLineCard
               key={line.item.id}
+              compact={isCompact}
               line={line}
               quote={getLineQuote(line)}
               onRemove={onRemove}
@@ -88,16 +98,23 @@ export function QuoteCartDrawer({
             />
           ))
         ) : (
-          <div className="rounded-2xl border border-dashed border-neutral-300 p-5 text-sm leading-6 text-neutral-500">
+          <div className="rounded-2xl border border-dashed border-neutral-300 p-4 text-sm leading-6 text-neutral-500">
             Add vendors from the rows to build a clean quote estimate.
           </div>
         )}
+        {isCompact && cart.length > 3 ? (
+          <p className="px-1 text-xs font-semibold text-neutral-500">
+            +{cart.length - 3} more selected
+          </p>
+        ) : null}
       </div>
 
-      <div className="mt-5 border-t border-neutral-100 pt-5">
+      <div className={`${isCompact ? "mt-4 pt-4" : "mt-5 pt-5"} border-t border-neutral-100`}>
         <div className="flex items-end justify-between">
           <p className="text-sm text-neutral-500">Estimated total</p>
-          <p className="text-3xl font-semibold">${total.toLocaleString()}</p>
+          <p className={`${isCompact ? "text-2xl" : "text-3xl"} font-semibold`}>
+            ${total.toLocaleString()}
+          </p>
         </div>
         <button
           type="button"
@@ -113,11 +130,13 @@ export function QuoteCartDrawer({
 }
 
 function CartLineCard({
+  compact = false,
   line,
   onRemove,
   onUpdateTime,
   quote,
 }: {
+  compact?: boolean;
   line: QuoteCartLine;
   onRemove: (itemId: number) => void;
   onUpdateTime: (
@@ -151,18 +170,20 @@ function CartLineCard({
           Remove
         </button>
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <CartTimeField
-          label="Start"
-          value={line.serviceStart}
-          onChange={(value) => onUpdateTime(line.item.id, "serviceStart", value)}
-        />
-        <CartTimeField
-          label="End"
-          value={line.serviceEnd}
-          onChange={(value) => onUpdateTime(line.item.id, "serviceEnd", value)}
-        />
-      </div>
+      {!compact ? (
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <CartTimeField
+            label="Start"
+            value={line.serviceStart}
+            onChange={(value) => onUpdateTime(line.item.id, "serviceStart", value)}
+          />
+          <CartTimeField
+            label="End"
+            value={line.serviceEnd}
+            onChange={(value) => onUpdateTime(line.item.id, "serviceEnd", value)}
+          />
+        </div>
+      ) : null}
       <div className="mt-3 flex items-end justify-between">
         <p className="text-xl font-semibold">${quote.toLocaleString()}</p>
         <p

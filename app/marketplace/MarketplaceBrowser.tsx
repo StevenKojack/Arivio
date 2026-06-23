@@ -273,10 +273,9 @@ export function MarketplaceBrowser() {
   ]);
   const canSaveCart = Boolean(profile && savedEvent);
   const cartedIds = useMemo(() => cart.map((line) => line.item.id), [cart]);
-  const cartedItems = useMemo(() => cart.map((line) => line.item), [cart]);
   const marketplaceRows = useMemo(
-    () => buildMarketplaceRows(filteredItems, cartedItems),
-    [cartedItems, filteredItems],
+    () => buildMarketplaceRows(filteredItems),
+    [filteredItems],
   );
   const activeRow = marketplaceRows.find((row) => row.id === activeRowId) ?? marketplaceRows[0];
   const mapPins = useMemo<MarketplaceMapPin[]>(() => {
@@ -582,12 +581,6 @@ export function MarketplaceBrowser() {
     setCart((current) => current.filter((line) => line.item.id !== itemId));
   }
 
-  function replaceCompletedCategory(services: ServiceName[]) {
-    setCart((current) =>
-      current.filter((line) => !itemPrimaryMatchesServices(line.item, services)),
-    );
-  }
-
   function selectMapItem(item: MarketplaceItem) {
     setSelectedMapItemId(item.id);
     setIsMobileMapOpen(false);
@@ -600,7 +593,7 @@ export function MarketplaceBrowser() {
     });
   }
 
-  function renderQuoteCart() {
+  function renderQuoteCart(variant: "panel" | "compact" = "panel") {
     return (
       <QuoteCartDrawer
         canSaveCart={canSaveCart}
@@ -609,6 +602,7 @@ export function MarketplaceBrowser() {
         eventSummary={`${eventDate || "Choose a date"} from ${startTime} to ${endTime}`}
         getLineQuote={getLineQuote}
         isRequestingQuotes={isRequestingQuotes}
+        variant={variant}
         onRemove={removeFromCart}
         onRequestQuotes={requestQuotes}
         onUpdateTime={updateCartTime}
@@ -711,7 +705,11 @@ export function MarketplaceBrowser() {
 
   return (
     <>
-      <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(380px,1fr)_minmax(390px,36vw)_300px] 2xl:grid-cols-[minmax(520px,1fr)_minmax(540px,36vw)_340px]">
+      <div className="hidden xl:sticky xl:top-20 xl:z-40 xl:mb-5 xl:flex xl:justify-end">
+        <div className="w-[min(420px,46vw)]">{renderQuoteCart("compact")}</div>
+      </div>
+
+      <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(460px,1fr)] xl:items-start">
         <div className="min-w-0 space-y-6">
           <EventContextPanel
             eventDate={eventDate}
@@ -744,7 +742,9 @@ export function MarketplaceBrowser() {
             >
               Map
             </button>
-            {renderQuoteCart()}
+            <div className="fixed bottom-5 left-4 right-24 z-40">
+              {renderQuoteCart("compact")}
+            </div>
           </div>
 
           {marketplaceRows.length ? (
@@ -753,18 +753,16 @@ export function MarketplaceBrowser() {
                 <div key={row.id} data-marketplace-row={row.id}>
                   <MarketplaceRow
                     activeItemId={selectedMapItemId}
+                    cartedIds={cartedIds}
                     hoveredItemId={hoveredItemId}
                     rowId={row.id}
-                    isComplete={row.isComplete}
                     title={row.title}
                     description={row.description}
                     items={row.items}
-                    selectedItems={row.selectedItems}
                     quoteContext={globalQuoteContext}
                     onAdd={addToCart}
                     onHoverItem={setHoveredItemId}
-                    onReplace={() => replaceCompletedCategory(row.serviceNames)}
-                    onSelectItem={(item) => setSelectedMapItemId(item.id)}
+                    onSelectItem={selectMapItem}
                   />
                 </div>
               ))}
@@ -790,13 +788,10 @@ export function MarketplaceBrowser() {
             layout="sticky"
             pins={mapPins}
             selectedItemId={selectedMapItemId}
+            onAddItem={addToCart}
             onHoverItem={setHoveredItemId}
             onSelectItem={selectMapItem}
           />
-        </aside>
-
-        <aside className="hidden min-w-0 xl:block" aria-label="Quote cart">
-          {renderQuoteCart()}
         </aside>
       </div>
 
@@ -829,6 +824,7 @@ export function MarketplaceBrowser() {
               layout="sheet"
               pins={mapPins}
               selectedItemId={selectedMapItemId}
+              onAddItem={addToCart}
               onHoverItem={setHoveredItemId}
               onSelectItem={selectMapItem}
             />
@@ -855,9 +851,7 @@ export function MarketplaceBrowser() {
 type MarketplaceRowGroup = {
   description: string;
   id: string;
-  isComplete: boolean;
   items: MarketplaceItem[];
-  selectedItems: MarketplaceItem[];
   serviceNames: ServiceName[];
   title: string;
 };
@@ -1044,18 +1038,8 @@ function SummaryPill({ label, value }: { label: string; value: string }) {
   );
 }
 
-function buildMarketplaceRows(
-  items: MarketplaceItem[],
-  cartedItems: MarketplaceItem[],
-): MarketplaceRowGroup[] {
-  const completedServices = Array.from(new Set(cartedItems.map((item) => item.type)));
-  const bestMatchItems = items
-    .filter(
-      (item) =>
-        cartedItems.some((cartedItem) => cartedItem.id === item.id) ||
-        !itemPrimaryMatchesServices(item, completedServices),
-    )
-    .slice(0, 10);
+function buildMarketplaceRows(items: MarketplaceItem[]): MarketplaceRowGroup[] {
+  const bestMatchItems = items.slice(0, 10);
   const rowDefinitions: Array<{
     description: string;
     id: string;
@@ -1142,29 +1126,7 @@ function buildMarketplaceRows(
     },
   ];
 
-  const rows = rowDefinitions
-    .map((row) => {
-      const selectedItems =
-        row.serviceNames.length === 0
-          ? []
-          : cartedItems.filter((item) =>
-              itemPrimaryMatchesServices(item, row.serviceNames),
-            );
-      const isComplete = row.id !== "best-matches" && selectedItems.length > 0;
-
-      return {
-        ...row,
-        isComplete,
-        items: isComplete ? selectedItems : row.items,
-        selectedItems,
-      };
-    })
-    .filter((row) => row.items.length > 0);
-
-  return [
-    ...rows.filter((row) => !row.isComplete),
-    ...rows.filter((row) => row.isComplete),
-  ];
+  return rowDefinitions.filter((row) => row.items.length > 0);
 }
 
 function byServices(items: MarketplaceItem[], services: ServiceName[]) {
@@ -1178,8 +1140,4 @@ function itemMatchesServices(item: MarketplaceItem, services: ServiceName[]) {
     services.includes(item.type) ||
     item.services.some((service) => services.includes(service))
   );
-}
-
-function itemPrimaryMatchesServices(item: MarketplaceItem, services: ServiceName[]) {
-  return services.includes(item.type);
 }

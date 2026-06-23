@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import mapboxgl, {
-  type GeoJSONSource,
   type LngLatBoundsLike,
   type Map as MapboxMap,
 } from "mapbox-gl";
@@ -24,6 +23,7 @@ type MarketplaceMapProps = {
   layout?: "panel" | "sheet" | "sticky";
   pins: MarketplaceMapPin[];
   selectedItemId: number | null;
+  onAddItem: (item: MarketplaceItem) => void;
   onHoverItem: (itemId: number | null) => void;
   onSelectItem: (item: MarketplaceItem) => void;
 };
@@ -33,6 +33,8 @@ const categoryColors: Partial<Record<ServiceName, string>> = {
   Catering: "#7a4f2b",
   DJ: "#4f46e5",
   "Live Music": "#4f46e5",
+  Balloons: "#be185d",
+  "Bounce Houses": "#db2777",
   Rentals: "#0f766e",
   Photography: "#7c3aed",
   "Photo Booth": "#7c3aed",
@@ -41,7 +43,11 @@ const categoryColors: Partial<Record<ServiceName, string>> = {
   "Character Performers": "#db2777",
   Security: "#b45309",
   Staffing: "#b45309",
+  Bartending: "#7a4f2b",
   Transportation: "#0369a1",
+  "Party Bus": "#0369a1",
+  Valet: "#0369a1",
+  Cleaning: "#475569",
   "Portable Restrooms": "#475569",
 };
 
@@ -51,8 +57,6 @@ const fallbackBounds = {
   minLat: 33.88,
   minLng: -118.55,
 };
-const eventFlowLayerId = "arivio-event-flow-line";
-const eventFlowSourceId = "arivio-event-flow";
 
 export function MarketplaceMap({
   activeCategory,
@@ -62,6 +66,7 @@ export function MarketplaceMap({
   layout = "sticky",
   pins,
   selectedItemId,
+  onAddItem,
   onHoverItem,
   onSelectItem,
 }: MarketplaceMapProps) {
@@ -148,6 +153,12 @@ export function MarketplaceMap({
       markerRefs.current.push(eventMarker);
     }
 
+    const closePopup = () => {
+      popupRef.current?.remove();
+    };
+
+    map.on("click", closePopup);
+
     pins.forEach((pin) => {
       const isHovered = hoveredItemId === pin.item.id;
       const isSelected = selectedItemId === pin.item.id;
@@ -163,22 +174,16 @@ export function MarketplaceMap({
 
       markerElement.addEventListener("mouseenter", () => {
         onHoverItem(pin.item.id);
-        popupRef.current
-          ?.setLngLat([pin.item.coordinates.lng, pin.item.coordinates.lat])
-          .setHTML(getPopupHtml(pin.item, false))
-          .addTo(map);
       });
       markerElement.addEventListener("mouseleave", () => {
         onHoverItem(null);
-        if (selectedItemId !== pin.item.id) {
-          popupRef.current?.remove();
-        }
       });
-      markerElement.addEventListener("click", () => {
+      markerElement.addEventListener("click", (event) => {
+        event.stopPropagation();
         onSelectItem(pin.item);
         popupRef.current
           ?.setLngLat([pin.item.coordinates.lng, pin.item.coordinates.lat])
-          .setHTML(getPopupHtml(pin.item, true))
+          .setHTML(getPopupHtml(pin.item))
           .addTo(map);
       });
 
@@ -187,15 +192,11 @@ export function MarketplaceMap({
         .addTo(map);
       markerRefs.current.push(marker);
     });
-
-    const selectedPin = pins.find((pin) => pin.item.id === selectedItemId);
-    if (selectedPin) {
-      popupRef.current
-        ?.setLngLat([selectedPin.item.coordinates.lng, selectedPin.item.coordinates.lat])
-        .setHTML(getPopupHtml(selectedPin.item, true))
-        .addTo(map);
-    }
+    return () => {
+      map.off("click", closePopup);
+    };
   }, [
+    onAddItem,
     cartedIds,
     eventCoordinates,
     hasInteractiveMap,
@@ -207,70 +208,50 @@ export function MarketplaceMap({
   ]);
 
   useEffect(() => {
-    if (!mapRef.current || !hasInteractiveMap) {
+    if (!mapRef.current || !hasInteractiveMap || !selectedItemId) {
       return;
     }
 
-    const map = mapRef.current;
-    const updateEventFlow = () => {
-      const cartedCoordinates = pins
-        .filter((pin) => cartedIds.includes(pin.item.id) || pin.isCarted)
-        .map((pin) => [pin.item.coordinates.lng, pin.item.coordinates.lat]);
-      const coordinates = [
-        ...(eventCoordinates ? [[eventCoordinates.lng, eventCoordinates.lat]] : []),
-        ...cartedCoordinates,
-      ];
-      const sourceData = {
-        features:
-          coordinates.length > 1
-            ? [
-                {
-                  geometry: {
-                    coordinates,
-                    type: "LineString",
-                  },
-                  properties: {},
-                  type: "Feature",
-                },
-              ]
-            : [],
-        type: "FeatureCollection",
-      };
-      const existingSource = map.getSource(eventFlowSourceId) as GeoJSONSource | undefined;
+    const selectedPin = pins.find((pin) => pin.item.id === selectedItemId);
 
-      if (existingSource) {
-        existingSource.setData(sourceData);
+    if (!selectedPin) {
+      return;
+    }
+
+    popupRef.current
+      ?.setLngLat([selectedPin.item.coordinates.lng, selectedPin.item.coordinates.lat])
+      .setHTML(getPopupHtml(selectedPin.item))
+      .addTo(mapRef.current);
+  }, [hasInteractiveMap, pins, selectedItemId]);
+
+  useEffect(() => {
+    function handlePopupAction(event: MouseEvent) {
+      const target = event.target as HTMLElement | null;
+      const button = target?.closest("[data-arivio-add-quote]");
+      const itemId = Number(button?.getAttribute("data-arivio-add-quote"));
+
+      if (!itemId) {
+        if (
+          target &&
+          !target.closest(".mapboxgl-popup") &&
+          !target.closest(".mapboxgl-marker")
+        ) {
+          popupRef.current?.remove();
+        }
         return;
       }
 
-      map.addSource(eventFlowSourceId, {
-        data: sourceData,
-        type: "geojson",
-      });
-      map.addLayer({
-        id: eventFlowLayerId,
-        layout: {
-          "line-cap": "round",
-          "line-join": "round",
-        },
-        paint: {
-          "line-color": "#ff5a5f",
-          "line-dasharray": [0.4, 1.4],
-          "line-opacity": 0.72,
-          "line-width": 4,
-        },
-        source: eventFlowSourceId,
-        type: "line",
-      });
-    };
+      const pin = pins.find((candidate) => candidate.item.id === itemId);
 
-    if (map.isStyleLoaded()) {
-      updateEventFlow();
-      return;
+      if (pin) {
+        onAddItem(pin.item);
+      }
     }
 
-    map.once("load", updateEventFlow);
-  }, [cartedIds, eventCoordinates, hasInteractiveMap, pins]);
+    document.addEventListener("click", handlePopupAction);
+
+    return () => document.removeEventListener("click", handlePopupAction);
+  }, [onAddItem, pins]);
 
   useEffect(() => {
     if (!mapRef.current || !hasInteractiveMap) {
@@ -347,12 +328,12 @@ export function MarketplaceMap({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm font-semibold text-neutral-950">
               {hasInteractiveMap
-                ? "Mapbox GL active - drag, pan, and zoom"
-                : "Mock map fallback active"}
+                ? "Drag, pan, and zoom around nearby providers"
+                : "Map preview with provider locations"}
             </p>
             <div className="flex flex-wrap gap-2 text-xs font-semibold">
               <LegendDot color="#111111" label="active row" />
-              <LegendDot color="#ff5a5f" label="carted" />
+              <LegendDot color="#256f4a" label="selected" />
               <LegendDot color="#2563eb" label="event" />
             </div>
           </div>
@@ -404,22 +385,22 @@ function FallbackMap({
             onClick={() => onSelectItem(pin.item)}
             onMouseEnter={() => onHoverItem(pin.item.id)}
             onMouseLeave={() => onHoverItem(null)}
-            className={`absolute z-20 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white text-xs font-semibold text-white shadow-[0_18px_44px_rgba(20,20,20,0.25)] transition duration-200 hover:-translate-y-[58%] ${
+            className={`absolute z-20 flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white text-white shadow-[0_18px_44px_rgba(20,20,20,0.25)] transition duration-200 hover:-translate-y-[58%] ${
               isSelected || isHovered
-                ? "scale-110 px-4 py-2"
+                ? "scale-110 ring-4 ring-neutral-950/10"
                 : isCarted
-                  ? "px-3.5 py-2 ring-4 ring-[#ff5a5f]/25"
+                  ? "ring-4 ring-emerald-600/25"
                   : pin.isActiveRowMatch
-                    ? "px-3.5 py-2"
-                    : "px-3 py-1.5 opacity-80"
+                    ? ""
+                    : "opacity-80"
             }`}
             style={{
-              backgroundColor: isCarted ? "#ff5a5f" : color,
+              backgroundColor: isCarted ? "#256f4a" : color,
               left: `${toPosition(pin.item.coordinates, bounds).x}%`,
               top: `${toPosition(pin.item.coordinates, bounds).y}%`,
             }}
           >
-            {isCarted ? "Cart" : pin.item.type}
+            <span dangerouslySetInnerHTML={{ __html: getServiceIcon(pin.item.type, 18) }} />
           </button>
         );
       })}
@@ -445,23 +426,20 @@ function createProviderMarker({
   const marker = document.createElement("button");
   marker.type = "button";
   marker.innerHTML = `
-    <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/95 text-neutral-950 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.7)]">
-      ${getServiceIcon(item.type)}
-    </span>
-    <span>${isCarted ? "Chosen" : getPriceBadge(item)}</span>
+    <span class="relative z-10">${getServiceIcon(item.type, 18)}</span>
+    <span class="absolute -bottom-1.5 left-1/2 h-3.5 w-3.5 -translate-x-1/2 rotate-45 rounded-[3px] border-b-2 border-r-2 border-white" style="background:${isCarted ? "#256f4a" : color};"></span>
   `;
-  marker.style.backgroundColor = isCarted ? "#ff5a5f" : color;
+  marker.style.backgroundColor = isCarted ? "#256f4a" : color;
   marker.className = [
-    "inline-flex",
+    "relative",
+    "flex",
+    "h-11",
+    "w-11",
     "items-center",
-    "gap-1.5",
+    "justify-center",
     "rounded-full",
     "border-2",
     "border-white",
-    "px-2.5",
-    "py-1.5",
-    "text-xs",
-    "font-semibold",
     "text-white",
     "shadow-[0_18px_44px_rgba(20,20,20,0.25)]",
     "transition",
@@ -469,7 +447,7 @@ function createProviderMarker({
     "ease-out",
     "hover:scale-110",
     "hover:shadow-[0_24px_56px_rgba(20,20,20,0.28)]",
-    isCarted ? "ring-4 ring-[#ff5a5f]/25" : "",
+    isCarted ? "ring-4 ring-emerald-600/25" : "",
     isActive ? "" : "opacity-80",
     isHovered || isSelected ? "scale-110 ring-4 ring-neutral-950/10" : "",
   ]
@@ -488,14 +466,14 @@ function createEventMarker() {
   return marker;
 }
 
-function getPopupHtml(item: MarketplaceItem, isSelected: boolean) {
+function getPopupHtml(item: MarketplaceItem) {
   return `
     <div style="font-family: Arial, Helvetica, sans-serif; width: 292px; overflow: hidden; border-radius: 22px; background: #fff;">
       <div style="height: 156px; background-image: linear-gradient(180deg, transparent 45%, rgba(0,0,0,.48)), url('${escapeHtml(
         getVendorImage(item),
       )}'); background-size: cover; background-position: center; position: relative;">
         <div style="position: absolute; left: 12px; bottom: 12px; display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; background: rgba(255,255,255,.92); padding: 6px 10px; color: #111; font-size: 12px; font-weight: 700;">
-          ${getServiceIcon(item.type)}
+          ${getServiceIcon(item.type, 14)}
           ${escapeHtml(item.type)}
         </div>
       </div>
@@ -515,13 +493,7 @@ function getPopupHtml(item: MarketplaceItem, isSelected: boolean) {
           <p style="margin: 0; font-size: 13px; font-weight: 800; color: #111;">${escapeHtml(
             item.price,
           )}</p>
-          <span style="border-radius: 999px; background: ${
-            isSelected ? "#111" : "#f5f5f4"
-          }; color: ${
-            isSelected ? "#fff" : "#555"
-          }; padding: 6px 10px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em;">${
-            isSelected ? "Selected" : "Preview"
-          }</span>
+          <button type="button" data-arivio-add-quote="${item.id}" style="border: 0; border-radius: 999px; background: #111; color: #fff; cursor: pointer; padding: 8px 12px; font-size: 12px; font-weight: 800;">Add to quote</button>
         </div>
       </div>
     </div>
@@ -563,20 +535,18 @@ function LegendDot({ color, label }: { color: string; label: string }) {
   );
 }
 
-function getPriceBadge(item: MarketplaceItem) {
-  const priceMatch = item.price.match(/\$[\d,]+/);
+function getServiceIcon(service: ServiceName, size = 14) {
+  const icons = serviceIcons(serviceIconBase(size));
 
-  return priceMatch?.[0] ?? item.type;
+  return icons[service] ?? icons.Venue ?? "";
 }
 
-function getServiceIcon(service: ServiceName) {
-  return serviceIcons[service] ?? serviceIcons.Venue;
+function serviceIconBase(size: number) {
+  return `width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"`;
 }
 
-const svgBase =
-  'width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
-
-const serviceIcons: Partial<Record<ServiceName, string>> = {
+function serviceIcons(svgBase: string): Partial<Record<ServiceName, string>> {
+  return {
   Venue: `<svg ${svgBase}><path d="M3 21h18"/><path d="M5 21V9l7-5 7 5v12"/><path d="M9 21v-7h6v7"/></svg>`,
   Catering: `<svg ${svgBase}><path d="M4 11a8 8 0 0 0 16 0"/><path d="M3 11h18"/><path d="M12 3v4"/><path d="M8 5v2"/><path d="M16 5v2"/></svg>`,
   "Cake & Desserts": `<svg ${svgBase}><path d="M4 21h16"/><path d="M5 21v-7h14v7"/><path d="M7 14V9h10v5"/><path d="M9 9V5"/><path d="M15 9V5"/></svg>`,
@@ -605,7 +575,8 @@ const serviceIcons: Partial<Record<ServiceName, string>> = {
   Cleaning: `<svg ${svgBase}><path d="m3 21 6-6"/><path d="m14 4 6 6"/><path d="m7 17 10-10"/><path d="M16 8l-2-2 2-2 4 4-2 2Z"/></svg>`,
   "Booth Rentals": `<svg ${svgBase}><path d="M4 21V8l8-5 8 5v13"/><path d="M8 21v-8h8v8"/><path d="M8 13h8"/></svg>`,
   "Portable Restrooms": `<svg ${svgBase}><path d="M7 21V5a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v16"/><path d="M9 9h6"/><path d="M12 9v12"/></svg>`,
-};
+  };
+}
 
 function getMapboxStyleUrl() {
   if (MAPBOX_STYLE_ID.startsWith("mapbox://")) {
